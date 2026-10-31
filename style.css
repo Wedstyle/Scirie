@@ -522,3 +522,103 @@ header {
   margin-bottom: 25px;
   color: var(--text-muted);
 }
+/* Ajoutez ceci à la fin de votre style.css */
+.bg-dark {
+  background: linear-gradient(135deg, #2c3e50, #1a252f);
+  border: 1px solid #34495e;
+}
+
+/* Pour que les chiffres négatifs soient bien visibles */
+.text-danger-profit {
+  color: #ff6b6b !important;
+}
+.text-success-profit {
+  color: #2ecc71 !important;
+}
+/* --- DEMANDES D'EMBAUCHE --- */
+.pending-user {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--bg-input);
+  padding: 12px 15px;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  border: 1px solid var(--border);
+}
+
+.pending-user span {
+  font-weight: bold;
+  color: var(--text-main);
+}
+
+.pending-user button {
+  background: var(--success);
+  color: white;
+  border: none;
+  padding: 8px 15px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: 0.2s;
+}
+
+.pending-user button:hover {
+  background: #27ae60;
+  transform: scale(1.05);
+}
+/* --- GESTION DU PERSONNEL --- */
+.personnel-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--bg-input);
+  padding: 10px 15px;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  border: 1px solid var(--border);
+}
+
+.personnel-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.personnel-info strong {
+  font-size: 1em;
+}
+
+.personnel-info span {
+  font-size: 0.8em;
+  color: var(--text-muted);
+}
+
+.personnel-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-action {
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 0.85em;
+  color: white;
+  transition: 0.2s;
+}
+
+.btn-action:hover {
+  transform: scale(1.05);
+}
+
+.btn-validate {
+  background: var(--success);
+}
+.btn-promote {
+  background: #f39c12;
+}
+.btn-fire {
+  background: var(--danger);
+}

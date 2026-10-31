@@ -18,7 +18,7 @@
     <div id="auth-screen" class="full-screen">
       <div class="auth-box">
         <h1><i class="fa-solid fa-tree"></i> Scierie d'Anga</h1>
-        <p class="subtitle">Système de Gestion RP</p>
+        <p class="subtitle">Système de Gestion</p>
 
         <div id="login-form">
           <h2>Pointage</h2>
@@ -309,12 +309,59 @@
                 <p id="stat-ventes">0.00 Septims</p>
               </div>
               <div class="stat-card bg-red">
-                <h3>Dépenses (Achats + Salaires)</h3>
+                <h3>Dépenses Globales (Achats + Salaires)</h3>
                 <p id="stat-achats">0.00 Septims</p>
               </div>
               <div class="stat-card bg-orange">
-                <h3>Bénéfice Net</h3>
+                <h3>Bénéfice Total</h3>
                 <p id="stat-benefice">0.00 Septims</p>
+              </div>
+            </div>
+
+            <!-- BÉNÉFICES PAR PÉRIODE -->
+            <div class="card mb-15">
+              <h3>
+                <i class="fa-solid fa-chart-line"></i> Bénéfices Nets par
+                Période
+              </h3>
+              <div
+                class="stats-grid"
+                style="
+                  grid-template-columns: repeat(4, 1fr);
+                  margin-bottom: 0;
+                  gap: 15px;
+                "
+              >
+                <div
+                  class="stat-card bg-dark text-center"
+                  style="padding: 15px"
+                >
+                  <h3 style="font-size: 0.9em">Aujourd'hui</h3>
+                  <p id="profit-jour" style="font-size: 1.5em">0.00 Septims</p>
+                </div>
+                <div
+                  class="stat-card bg-dark text-center"
+                  style="padding: 15px"
+                >
+                  <h3 style="font-size: 0.9em">7 derniers jours</h3>
+                  <p id="profit-semaine" style="font-size: 1.5em">
+                    0.00 Septims
+                  </p>
+                </div>
+                <div
+                  class="stat-card bg-dark text-center"
+                  style="padding: 15px"
+                >
+                  <h3 style="font-size: 0.9em">Ce mois-ci</h3>
+                  <p id="profit-mois" style="font-size: 1.5em">0.00 Septims</p>
+                </div>
+                <div
+                  class="stat-card bg-dark text-center"
+                  style="padding: 15px"
+                >
+                  <h3 style="font-size: 0.9em">Depuis toujours</h3>
+                  <p id="profit-total" style="font-size: 1.5em">0.00 Septims</p>
+                </div>
               </div>
             </div>
 
@@ -333,9 +380,12 @@
               <div class="col-left">
                 <div class="card">
                   <h3>
-                    <i class="fa-solid fa-user-check"></i> Demandes d'embauche
+                    <i class="fa-solid fa-users-gear"></i> Gestion du Personnel
                   </h3>
-                  <div id="admin-pending-list"></div>
+                  <div
+                    id="admin-personnel-list"
+                    style="max-height: 400px; overflow-y: auto"
+                  ></div>
                 </div>
 
                 <div class="card">

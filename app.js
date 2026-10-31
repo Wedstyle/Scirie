@@ -1,9 +1,15 @@
+// ==========================================
+// CONFIGURATION SUPABASE
+// ==========================================
 const SUPABASE_URL = "https://ifbvulvyhledklktzjrv.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlmYnZ1bHZ5aGxlZGtsa3R6anJ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMzOTE4OTUsImV4cCI6MjEwODk2Nzg5NX0.V0RQSqrZWVUIXprRjy5z5ax-4e8MT51yclDgpbf0oSc";
 
 const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+// ==========================================
+// VARIABLES GLOBALES
+// ==========================================
 let currentUser = null;
 let userProfile = null;
 let chartAchatsInstance = null;
@@ -16,6 +22,7 @@ const basePricesVente = {
   "Briquettes de Charbon": 4.0,
   "Coke de charbon": 6.0,
 };
+
 const basePricesAchat = {
   "Petit bois": 0.0,
   "Charbon Pauvre": 0.3,
@@ -23,6 +30,7 @@ const basePricesAchat = {
   "Briquettes de Charbon": 3.0,
   "Coke de charbon": 5.0,
 };
+
 const typeColors = {
   "Petit bois": "#8B4513",
   "Charbon Pauvre": "#5a5a5a",
@@ -32,12 +40,15 @@ const typeColors = {
   Salaire: "#8e44ad",
 };
 
-// --- UI HELPERS ---
+// ==========================================
+// UI HELPERS
+// ==========================================
 function showPopup(title, message) {
   document.getElementById("popup-title").innerText = title;
   document.getElementById("popup-message").innerText = message;
   document.getElementById("custom-popup").style.display = "flex";
 }
+
 function closePopup() {
   document.getElementById("custom-popup").style.display = "none";
 }
@@ -60,7 +71,9 @@ function switchTab(tabId, btnElement) {
   if (btnElement) btnElement.classList.add("active");
 }
 
-// --- AUTHENTIFICATION ---
+// ==========================================
+// AUTHENTIFICATION
+// ==========================================
 async function register() {
   const pseudo = document.getElementById("reg-pseudo").value.trim();
   const password = document.getElementById("reg-password").value;
@@ -103,7 +116,9 @@ async function logout() {
   location.reload();
 }
 
-// --- INITIALISATION & RÔLES ---
+// ==========================================
+// INITIALISATION & RÔLES
+// ==========================================
 async function checkUserStatus() {
   let { data: profile } = await db
     .from("profiles")
@@ -153,7 +168,9 @@ async function checkUserStatus() {
   updateBasePrice();
 }
 
-// --- GESTION DES COMMANDES ---
+// ==========================================
+// GESTION DES COMMANDES
+// ==========================================
 async function createOrder(e) {
   e.preventDefault();
   const client_name = document.getElementById("ord-client").value.trim();
@@ -173,7 +190,6 @@ async function createOrder(e) {
       deadline,
       created_by: currentUser.id,
     });
-
   if (error) showPopup("Erreur", error.message);
   else {
     showPopup("Succès", "Commande créée !");
@@ -200,22 +216,14 @@ async function loadOrders() {
 
       container.innerHTML += `
                 <div class="order-card" style="border-left-color: ${color};">
-                    <div>
-                        <h4>${o.item_type}</h4>
-                        <div class="client">Client : ${o.client_name}</div>
-                        <div class="details">
-                            <span><strong>Quantité :</strong> ${o.quantity}</span>
-                            <span><strong>Prix U. :</strong> ${o.unit_price} Septims</span>
-                            <span><strong>Total :</strong> ${total} Septims</span>
-                            ${dateHtml}
-                        </div>
+                    <div><h4>${o.item_type}</h4><div class="client">Client : ${o.client_name}</div>
+                        <div class="details"><span><strong>Quantité :</strong> ${o.quantity}</span><span><strong>Prix U. :</strong> ${o.unit_price} Septims</span><span><strong>Total :</strong> ${total} Septims</span>${dateHtml}</div>
                     </div>
                     <div class="actions">
                         <button class="btn-honor" onclick="honorOrder(${o.id}, '${o.client_name}', '${o.item_type}', ${o.quantity}, ${o.unit_price})"><i class="fa-solid fa-check"></i> Honorer</button>
                         <button class="btn-cancel" onclick="cancelOrder(${o.id})"><i class="fa-solid fa-xmark"></i> Annuler</button>
                     </div>
-                </div>
-            `;
+                </div>`;
     });
   } else {
     container.innerHTML =
@@ -249,7 +257,7 @@ async function honorOrder(id, client_name, item_type, quantity, unit_price) {
 
   await db.from("orders").delete().eq("id", id);
 
-  showPopup("Commande Honorée", "Vente enregistrée et stock mis à jour !");
+  showPopup("Commande Honorée", "Vente enregistrée !");
   loadOrders();
   loadStock();
   loadEmployeData();
@@ -262,7 +270,9 @@ async function cancelOrder(id) {
   loadOrders();
 }
 
-// --- GESTION DU STOCK ---
+// ==========================================
+// GESTION DU STOCK
+// ==========================================
 async function loadStock() {
   const { data: stocks } = await db.from("stocks").select("*").order("id");
   const container = document.getElementById("stock-container");
@@ -277,12 +287,7 @@ async function loadStock() {
           ? `<input type="number" value="${s.quantity}" onchange="updateStockManual(${s.id}, this.value)">`
           : `<div class="qty">${s.quantity}</div>`;
 
-      container.innerHTML += `
-                <div class="stock-item" style="border-left-color: ${color};">
-                    <h4 style="background-color: ${color}; color: ${textColor};">${s.item_name}</h4>
-                    ${qtyHtml}
-                </div>
-            `;
+      container.innerHTML += `<div class="stock-item" style="border-left-color: ${color};"><h4 style="background-color: ${color}; color: ${textColor};">${s.item_name}</h4>${qtyHtml}</div>`;
     });
   }
 }
@@ -294,21 +299,26 @@ async function updateStockManual(id, newQty) {
     .eq("id", id);
 }
 
-// --- SAISIE DIRECTE ---
+// ==========================================
+// SAISIE DIRECTE
+// ==========================================
 function updateBasePrice() {
   const type = document.getElementById("emp-type").value;
   const select = document.getElementById("emp-item");
   const item = select.value;
   let price =
     type === "vente" ? basePricesVente[item] || 0 : basePricesAchat[item] || 0;
+
   document.getElementById("emp-price").value = price.toFixed(2);
   select.style.backgroundColor = typeColors[item] || "#333";
   select.style.color = item === "Charbon Normale" ? "#333" : "#fff";
+
   calcEmpTotal();
 }
 
 document.getElementById("emp-quantity").addEventListener("input", calcEmpTotal);
 document.getElementById("emp-price").addEventListener("input", calcEmpTotal);
+
 function calcEmpTotal() {
   const q = parseFloat(document.getElementById("emp-quantity").value) || 0;
   const p = parseFloat(document.getElementById("emp-price").value) || 0;
@@ -363,15 +373,23 @@ async function loadEmployeData() {
     .order("created_at", { ascending: false });
   const tbody = document.getElementById("emp-history-body");
   tbody.innerHTML = "";
+
   if (data) {
     data.forEach((t) => {
       const cost = t.quantity * t.unit_price;
       const color = typeColors[t.item_type] || "#888";
       const textColor = t.item_type === "Charbon Normale" ? "#333" : "#fff";
+      let badgeClass =
+        t.type === "vente"
+          ? "bg-green"
+          : t.type === "salaire"
+            ? "bg-purple"
+            : "bg-red";
+
       tbody.innerHTML += `
                 <tr>
                     <td>${new Date(t.created_at).toLocaleDateString()}</td>
-                    <td><span class="badge-type ${t.type === "vente" ? "bg-green" : t.type === "salaire" ? "bg-purple" : "bg-red"}">${t.type.toUpperCase()}</span></td>
+                    <td><span class="badge-type ${badgeClass}">${t.type.toUpperCase()}</span></td>
                     <td><span class="badge-type" style="background-color: ${color}; color: ${textColor};">${t.item_type}</span></td>
                     <td class="${t.type === "vente" ? "text-success" : "text-danger"}">${cost.toFixed(2)} Septims</td>
                 </tr>`;
@@ -379,81 +397,162 @@ async function loadEmployeData() {
   }
 }
 
-// --- VUE GESTION (PATRON) ---
+// ==========================================
+// VUE GESTION (PATRON)
+// ==========================================
 async function loadPatronData() {
-  // Demandes d'embauche
-  const { data: pending } = await db
+  // 1. Gestion du Personnel
+  const personnelDiv = document.getElementById("admin-personnel-list");
+  personnelDiv.innerHTML =
+    '<p class="text-muted">Chargement du personnel...</p>';
+
+  const { data: personnel, error } = await db
     .from("profiles")
     .select("*")
-    .eq("is_approved", false);
-  const pendDiv = document.getElementById("admin-pending-list");
-  pendDiv.innerHTML = pending.length
-    ? ""
-    : '<p class="text-muted">Aucune demande.</p>';
-  if (pending)
-    pending.forEach(
-      (p) =>
-        (pendDiv.innerHTML += `<div class="pending-user"><span>${p.full_name}</span><button onclick="approveUser('${p.id}')">Valider</button></div>`),
-    );
+    .order("created_at", { ascending: true });
 
-  // Salaires (Contrats)
+  if (error) {
+    console.error("Erreur chargement personnel:", error);
+    personnelDiv.innerHTML = `<p class="text-danger">Erreur : ${error.message}</p>`;
+  } else if (!personnel || personnel.length === 0) {
+    personnelDiv.innerHTML =
+      '<p class="text-muted">Aucun employé enregistré.</p>';
+  } else {
+    personnelDiv.innerHTML = "";
+    personnel.forEach((p) => {
+      const isMe = p.id === currentUser.id;
+      let actionHtml = "";
+
+      if (p.is_approved) {
+        actionHtml = `<button class="btn-action btn-fire" onclick="virerUtilisateur('${p.id}', '${p.full_name}')" ${isMe ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : ""}><i class="fa-solid fa-trash"></i> Virer</button>`;
+      } else {
+        actionHtml = `<button class="btn-action btn-validate" onclick="validerUtilisateur('${p.id}')"><i class="fa-solid fa-check"></i> Valider</button>
+                              <button class="btn-action btn-fire" onclick="virerUtilisateur('${p.id}', '${p.full_name}')"><i class="fa-solid fa-trash"></i> Refuser</button>`;
+      }
+
+      if (p.role === "employe" && p.is_approved) {
+        actionHtml =
+          `<button class="btn-action btn-promote" onclick="promouvoirUtilisateur('${p.id}')"><i class="fa-solid fa-arrow-up"></i> Promouvoir</button>` +
+          actionHtml;
+      }
+
+      const roleBadge =
+        p.role === "patron"
+          ? '<span style="color:var(--accent); font-weight:bold;">Patron</span>'
+          : "Employé";
+      const statusBadge = p.is_approved
+        ? ""
+        : '<span style="color:var(--danger); font-weight:bold;">(En attente)</span>';
+
+      personnelDiv.innerHTML += `
+                <div class="personnel-row">
+                    <div class="personnel-info"><strong>${p.full_name} ${isMe ? "(Vous)" : ""}</strong><span>Rôle : ${roleBadge} ${statusBadge}</span></div>
+                    <div class="personnel-actions">${actionHtml}</div>
+                </div>`;
+    });
+  }
+
+  // 2. Salaires
   const { data: employees } = await db.from("employees").select("*");
   const salDiv = document.getElementById("admin-salaries-list");
   salDiv.innerHTML = "";
-  employees.forEach(
-    (e) =>
-      (salDiv.innerHTML += `<div class="salary-row"><input type="text" value="${e.name}" id="sal-name-${e.id}"><input type="number" value="${e.salary}" id="sal-amount-${e.id}"></div>`),
-  );
+  if (employees) {
+    employees.forEach(
+      (e) =>
+        (salDiv.innerHTML += `<div class="salary-row"><input type="text" value="${e.name}" id="sal-name-${e.id}" placeholder="Nom"><input type="number" value="${e.salary}" id="sal-amount-${e.id}" placeholder="Septims"></div>`),
+    );
+  }
 
-  // Transactions Globales
+  // 3. Transactions Globales
   const { data: transactions } = await db
     .from("transactions")
     .select("*")
     .order("created_at", { ascending: false });
   const tbody = document.getElementById("admin-history-body");
   tbody.innerHTML = "";
-
   let totalAchats = 0,
     totalVentes = 0,
     totalSalairesPayes = 0;
 
-  transactions.forEach((t) => {
-    const cost = t.quantity * t.unit_price;
-    if (t.type === "achat") totalAchats += cost;
-    else if (t.type === "salaire") totalSalairesPayes += cost;
-    else totalVentes += cost;
+  if (transactions) {
+    transactions.forEach((t) => {
+      const cost = t.quantity * t.unit_price;
+      if (t.type === "achat") totalAchats += cost;
+      else if (t.type === "salaire") totalSalairesPayes += cost;
+      else totalVentes += cost;
 
-    const color = typeColors[t.item_type] || "#888";
-    const textColor = t.item_type === "Charbon Normale" ? "#333" : "#fff";
+      const color = typeColors[t.item_type] || "#888";
+      const textColor = t.item_type === "Charbon Normale" ? "#333" : "#fff";
+      let badgeClass =
+        t.type === "vente"
+          ? "bg-green"
+          : t.type === "salaire"
+            ? "bg-purple"
+            : "bg-red";
 
-    let badgeClass =
-      t.type === "vente"
-        ? "bg-green"
-        : t.type === "salaire"
-          ? "bg-purple"
-          : "bg-red";
+      tbody.innerHTML += `
+                <tr>
+                    <td>${new Date(t.created_at).toLocaleDateString()}</td>
+                    <td>${t.counterparty_name}</td>
+                    <td><span class="badge-type ${badgeClass}">${t.type.toUpperCase()}</span></td>
+                    <td><span class="badge-type" style="background-color: ${color}; color: ${textColor};">${t.item_type}</span></td>
+                    <td class="${t.type === "vente" ? "text-success" : "text-danger"}">${cost.toFixed(2)} Septims</td>
+                    <td><button class="btn-icon text-danger" onclick="deleteTransaction(${t.id})"><i class="fa-solid fa-trash"></i></button></td>
+                </tr>`;
+    });
+  }
 
-    tbody.innerHTML += `
-            <tr>
-                <td>${new Date(t.created_at).toLocaleDateString()}</td>
-                <td>${t.counterparty_name}</td>
-                <td><span class="badge-type ${badgeClass}">${t.type.toUpperCase()}</span></td>
-                <td><span class="badge-type" style="background-color: ${color}; color: ${textColor};">${t.item_type}</span></td>
-                <td class="${t.type === "vente" ? "text-success" : "text-danger"}">${cost.toFixed(2)} Septims</td>
-                <td><button class="btn-icon text-danger" onclick="deleteTransaction(${t.id})"><i class="fa-solid fa-trash"></i></button></td>
-            </tr>`;
-  });
-
-  // Calcul du vrai Bénéfice Net (Ventes - Achats - Salaires payés)
+  // Calculs des totaux
   const totalDepenses = totalAchats + totalSalairesPayes;
   document.getElementById("stat-ventes").innerText =
     totalVentes.toFixed(2) + " Septims";
   document.getElementById("stat-achats").innerText =
     totalDepenses.toFixed(2) + " Septims";
-  document.getElementById("stat-benefice").innerText =
-    (totalVentes - totalDepenses).toFixed(2) + " Septims";
 
-  renderCharts(transactions);
+  const now = new Date();
+  const todayStr = now.toISOString().split("T")[0];
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(now.getDate() - 7);
+  sevenDaysAgo.setHours(0, 0, 0, 0);
+  const currentMonth = now.getMonth();
+  const currentYear = now.getFullYear();
+
+  const calcProfit = (filteredTransactions) => {
+    let profit = 0;
+    filteredTransactions.forEach((t) => {
+      const cost = t.quantity * t.unit_price;
+      if (t.type === "vente") profit += cost;
+      else profit -= cost;
+    });
+    return profit;
+  };
+
+  if (transactions) {
+    const transJour = transactions.filter((t) =>
+      t.created_at.startsWith(todayStr),
+    );
+    const transSemaine = transactions.filter(
+      (t) => new Date(t.created_at) >= sevenDaysAgo,
+    );
+    const transMois = transactions.filter((t) => {
+      const d = new Date(t.created_at);
+      return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+    });
+
+    const updateProfitElement = (id, value) => {
+      const el = document.getElementById(id);
+      el.innerText = value.toFixed(2) + " Septims";
+      el.className = value >= 0 ? "text-success-profit" : "text-danger-profit";
+    };
+
+    updateProfitElement("profit-jour", calcProfit(transJour));
+    updateProfitElement("profit-semaine", calcProfit(transSemaine));
+    updateProfitElement("profit-mois", calcProfit(transMois));
+    updateProfitElement("profit-total", calcProfit(transactions));
+    updateProfitElement("stat-benefice", calcProfit(transactions));
+
+    renderCharts(transactions);
+  }
 }
 
 function renderCharts(transactions) {
@@ -526,10 +625,61 @@ function renderCharts(transactions) {
   });
 }
 
-// --- ACTIONS PATRON ---
-async function approveUser(id) {
-  await db.from("profiles").update({ is_approved: true }).eq("id", id);
-  loadPatronData();
+// ==========================================
+// ACTIONS PATRON
+// ==========================================
+async function validerUtilisateur(id) {
+  const { error } = await db
+    .from("profiles")
+    .update({ is_approved: true })
+    .eq("id", id);
+  if (error) showPopup("Erreur", "Impossible de valider.");
+  else {
+    showPopup("Validé", "Le joueur peut maintenant travailler.");
+    loadPatronData();
+  }
+}
+
+async function promouvoirUtilisateur(id) {
+  if (
+    !confirm(
+      "Voulez-vous vraiment nommer ce joueur Patron ? Il aura accès à toute la gestion.",
+    )
+  )
+    return;
+  const { error } = await db
+    .from("profiles")
+    .update({ role: "patron" })
+    .eq("id", id);
+  if (error) showPopup("Erreur", "Impossible de promouvoir.");
+  else {
+    showPopup("Promu", "Le joueur est maintenant Patron.");
+    loadPatronData();
+  }
+}
+
+async function virerUtilisateur(id, nom) {
+  if (
+    !confirm(
+      `Voulez-vous vraiment VIRER ${nom} ? Son compte sera définitivement supprimé.`,
+    )
+  )
+    return;
+
+  const { error } = await db.rpc("supprimer_utilisateur", {
+    target_user_id: id,
+  });
+
+  if (error) {
+    console.error(error);
+    showPopup(
+      "Erreur",
+      "Impossible de virer. Avez-vous bien exécuté le code SQL ?",
+    );
+  } else {
+    showPopup("Viré", `${nom} a été supprimé de la base de données.`);
+    loadPatronData();
+  }
 }
 
 async function deleteTransaction(id) {
@@ -586,12 +736,10 @@ async function paySalaries() {
     };
   });
 
-  // Insérer toutes les transactions d'un coup
   const { error } = await db.from("transactions").insert(transactionsToInsert);
 
-  if (error) {
-    showPopup("Erreur", "Erreur lors du paiement : " + error.message);
-  } else {
+  if (error) showPopup("Erreur", "Erreur lors du paiement : " + error.message);
+  else {
     showPopup(
       "Salaires Payés",
       `${totalPaye.toFixed(2)} Septims ont été distribués aux employés.`,
@@ -600,6 +748,9 @@ async function paySalaries() {
   }
 }
 
+// ==========================================
+// DÉMARRAGE
+// ==========================================
 db.auth.getSession().then(({ data: { session } }) => {
   if (session) {
     currentUser = session.user;
