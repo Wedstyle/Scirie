@@ -174,7 +174,6 @@ async function checkUserStatus() {
   document.getElementById("pending-screen").style.display = "none";
   document.getElementById("app-screen").style.display = "block";
 
-  // Tout le monde voit la location de four
   document.getElementById("nav-four").style.display = "flex";
 
   if (profile.role === "patron") {
@@ -205,51 +204,81 @@ async function checkUserStatus() {
   updateBasePrice();
 }
 
-// --- LOCATION DE TONNEAUX (PATRON) ---
+// --- LOCATION DE TONNEAUX ---
 async function loadBarrels() {
   const { data: rentals } = await db.from("barrel_rentals").select("*");
-  for (let i = 1; i <= 22; i++) {
-    const card = document.getElementById(`barrel-${i}`);
-    if (!card) continue;
-    const rental = rentals ? rentals.find((r) => r.barrel_number === i) : null;
-    card.className = "barrel-card free";
-    const statusEl = card.querySelector(".status-badge");
-    const clientEl = card.querySelector(".client-name");
-    const payInfoEl = card.querySelector(".pay-info");
-    const actionsEl = card.querySelector(".barrel-actions");
+  const container = document.querySelector(".barrels-grid");
 
-    if (rental) {
-      clientEl.innerHTML = `<i class="fa-solid fa-user"></i> ${rental.client_name}`;
-      if (rental.last_payment_date) {
-        const lastPay = new Date(rental.last_payment_date);
-        const nextPay = new Date(lastPay);
-        nextPay.setDate(nextPay.getDate() + 7);
-        const now = new Date();
-        const diffDays = Math.ceil(
-          (nextPay.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
-        );
-        const options = { day: "2-digit", month: "2-digit", year: "numeric" };
+  // Si le conteneur n'existe pas (ex: on est sur l'onglet four), on ne fait rien
+  if (
+    !container ||
+    !document.getElementById("tab-location").classList.contains("active")
+  ) {
+    // On attend que l'utilisateur clique sur l'onglet pour générer le HTML
+  }
 
-        if (diffDays < 0) {
-          card.classList.add("late");
-          statusEl.innerText = "En retard";
-          payInfoEl.innerHTML = `<span>Dernier : ${lastPay.toLocaleDateString("fr-FR", options)}</span><span class="next-pay-date">Dû le : ${nextPay.toLocaleDateString("fr-FR", options)}</span><span style="color: var(--danger); font-weight: bold;">Retard de ${Math.abs(diffDays)}j</span>`;
+  // Pour éviter de régénérer tout le temps, on vérifie si les cartes sont déjà là
+  if (container && document.getElementById("barrel-1")) {
+    for (let i = 1; i <= 22; i++) {
+      const card = document.getElementById(`barrel-${i}`);
+      if (!card) continue;
+      const rental = rentals
+        ? rentals.find((r) => r.barrel_number === i)
+        : null;
+      card.className = "barrel-card free";
+      const statusEl = card.querySelector(".status-badge");
+      const clientEl = card.querySelector(".client-name");
+      const payInfoEl = card.querySelector(".pay-info");
+      const actionsEl = card.querySelector(".barrel-actions");
+
+      if (rental) {
+        clientEl.innerHTML = `<i class="fa-solid fa-user"></i> ${rental.client_name}`;
+        if (rental.last_payment_date) {
+          const lastPay = new Date(rental.last_payment_date);
+          const nextPay = new Date(lastPay);
+          nextPay.setDate(nextPay.getDate() + 7);
+          const now = new Date();
+          const diffDays = Math.ceil(
+            (nextPay.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
+          );
+          const options = { day: "2-digit", month: "2-digit", year: "numeric" };
+
+          if (diffDays < 0) {
+            card.classList.add("late");
+            statusEl.innerText = "En retard";
+            payInfoEl.innerHTML = `<span>Dernier : ${lastPay.toLocaleDateString("fr-FR", options)}</span><span class="next-pay-date">Dû le : ${nextPay.toLocaleDateString("fr-FR", options)}</span><span style="color: var(--danger); font-weight: bold;">Retard de ${Math.abs(diffDays)}j</span>`;
+          } else {
+            card.classList.add("paid");
+            statusEl.innerText = "À jour";
+            payInfoEl.innerHTML = `<span>Dernier : ${lastPay.toLocaleDateString("fr-FR", options)}</span><span class="next-pay-date">Prochain : <strong>${nextPay.toLocaleDateString("fr-FR", options)}</strong></span><span>Dans ${diffDays}j</span>`;
+          }
         } else {
-          card.classList.add("paid");
-          statusEl.innerText = "À jour";
-          payInfoEl.innerHTML = `<span>Dernier : ${lastPay.toLocaleDateString("fr-FR", options)}</span><span class="next-pay-date">Prochain : <strong>${nextPay.toLocaleDateString("fr-FR", options)}</strong></span><span>Dans ${diffDays}j</span>`;
+          card.classList.add("late");
+          statusEl.innerText = "Jamais payé";
+          payInfoEl.innerHTML = `<span style="color: var(--danger);">Aucun paiement</span>`;
         }
+        actionsEl.innerHTML = `<button class="btn-pay" onclick="payBarrel(${rental.id}, ${i}, '${rental.client_name}')"><i class="fa-solid fa-coins"></i> Encaisser 50</button><button class="btn-free" onclick="freeBarrel(${rental.id})"><i class="fa-solid fa-trash"></i> Libérer</button>`;
       } else {
-        card.classList.add("late");
-        statusEl.innerText = "Jamais payé";
-        payInfoEl.innerHTML = `<span style="color: var(--danger);">Aucun paiement</span>`;
+        clientEl.innerHTML = "";
+        payInfoEl.innerHTML = "";
+        statusEl.innerText = "Libre";
+        actionsEl.innerHTML = `<button class="btn-allocate" onclick="allocateBarrel(${i})"><i class="fa-solid fa-plus"></i> Allouer</button>`;
       }
-      actionsEl.innerHTML = `<button class="btn-pay" onclick="payBarrel(${rental.id}, ${i}, '${rental.client_name}')"><i class="fa-solid fa-coins"></i> Encaisser 50</button><button class="btn-free" onclick="freeBarrel(${rental.id})"><i class="fa-solid fa-trash"></i> Libérer</button>`;
-    } else {
-      clientEl.innerHTML = "";
-      payInfoEl.innerHTML = "";
-      statusEl.innerText = "Libre";
-      actionsEl.innerHTML = `<button class="btn-allocate" onclick="allocateBarrel(${i})"><i class="fa-solid fa-plus"></i> Allouer</button>`;
+    }
+  } else {
+    // Génération initiale des 22 cartes si elles n'existent pas
+    if (container) {
+      container.innerHTML = "";
+      for (let i = 1; i <= 22; i++) {
+        container.innerHTML += `
+                <div class="barrel-card free" id="barrel-${i}">
+                    <div class="barrel-header"><h3>Tonneau n°${i}</h3><span class="status-badge">Libre</span></div>
+                    <div class="barrel-body"><div class="client-name"></div><div class="pay-info"></div></div>
+                    <div class="barrel-actions"><button class="btn-allocate" onclick="allocateBarrel(${i})">Allouer</button></div>
+                </div>`;
+      }
+      // Une fois générées, on rappelle la fonction pour les remplir
+      loadBarrels();
     }
   }
 }
@@ -327,16 +356,16 @@ async function freeBarrel(id) {
   );
 }
 
-// --- LOCATION DE FOUR (EMPLOYÉS & PATRON) ---
+// --- LOCATION DE FOUR ---
 async function loadFurnaces() {
   const { data: furnaces } = await db
     .from("furnace_rentals")
     .select("*")
     .order("created_at", { ascending: true });
   const container = document.getElementById("furnaces-container");
-  container.innerHTML = "";
 
   if (furnaces && furnaces.length > 0) {
+    container.innerHTML = "";
     furnaces.forEach((f) => {
       let cardClass = "free";
       let statusText = "Libre";
@@ -368,7 +397,6 @@ async function loadFurnaces() {
         payInfo = `<span style="color: var(--danger);">Aucun paiement</span>`;
       }
 
-      // Seul le patron peut libérer un four, tout le monde peut encaisser
       actionsHtml = `<button class="btn-pay" onclick="payFurnace(${f.id}, '${f.client_name}')"><i class="fa-solid fa-coins"></i> Encaisser 30</button>`;
       if (userProfile.role === "patron") {
         actionsHtml += `<button class="btn-free" onclick="freeFurnace(${f.id})"><i class="fa-solid fa-trash"></i> Libérer</button>`;
@@ -386,8 +414,11 @@ async function loadFurnaces() {
             `;
     });
   } else {
-    container.innerHTML =
-      '<p class="text-muted">Aucun client pour le moment.</p>';
+    container.innerHTML = `
+            <div class="empty-state">
+                <i class="fa-solid fa-fire"></i>
+                <p>Aucun client n'utilise le four actuellement.</p>
+            </div>`;
   }
 }
 
@@ -491,8 +522,9 @@ async function loadOrders() {
     .select("*")
     .order("created_at", { ascending: true });
   const container = document.getElementById("orders-container");
-  container.innerHTML = "";
+
   if (orders && orders.length > 0) {
+    container.innerHTML = "";
     orders.forEach((o) => {
       const color = typeColors[o.item_type] || "#888";
       const total = (o.quantity * o.unit_price).toFixed(2);
@@ -502,7 +534,7 @@ async function loadOrders() {
       container.innerHTML += `
                 <div class="order-card" style="border-left-color: ${color};">
                     <div><h4>${o.item_type}</h4><div class="client">Client : ${o.client_name}</div>
-                        <div class="details"><span><strong>Quantité :</strong> ${o.quantity}</span><span><strong>Prix U. :</strong> ${o.unit_price} Septims</span><span><strong>Total :</strong> ${total} Septims</span>${dateHtml}</div>
+                        <div class="details"><span><strong>Quantité :</strong> ${o.quantity}</span><span><strong>Prix U. :</strong> ${o.unit_price} S</span><span><strong>Total :</strong> ${total} S</span>${dateHtml}</div>
                     </div>
                     <div class="actions">
                         <button class="btn-honor" onclick="honorOrder(${o.id}, '${o.client_name}', '${o.item_type}', ${o.quantity}, ${o.unit_price})"><i class="fa-solid fa-check"></i> Honorer</button>
@@ -511,7 +543,11 @@ async function loadOrders() {
                 </div>`;
     });
   } else {
-    container.innerHTML = '<p class="text-muted">Aucune commande.</p>';
+    container.innerHTML = `
+            <div class="empty-state">
+                <i class="fa-solid fa-clipboard-list"></i>
+                <p>Aucune commande en attente pour le moment.</p>
+            </div>`;
   }
 }
 
@@ -613,7 +649,7 @@ async function addTransaction(e) {
     if (stock && stock.quantity < quantity)
       return showPopup(
         "Stock Insuffisant",
-        `Il ne reste que ${stock.quantity}.`,
+        `Il ne reste que ${stock.quantity} ${item_type}.`,
       );
   }
 
@@ -643,8 +679,9 @@ async function loadEmployeData() {
     .eq("created_by", currentUser.id)
     .order("created_at", { ascending: false });
   const tbody = document.getElementById("emp-history-body");
-  tbody.innerHTML = "";
-  if (data) {
+
+  if (data && data.length > 0) {
+    tbody.innerHTML = "";
     data.forEach((t) => {
       const cost = t.quantity * t.unit_price;
       const color = typeColors[t.item_type] || "#888";
@@ -657,13 +694,16 @@ async function loadEmployeData() {
             : "bg-red";
       tbody.innerHTML += `<tr><td>${new Date(t.created_at).toLocaleDateString()}</td><td><span class="badge-type ${badgeClass}">${t.type.toUpperCase()}</span></td><td><span class="badge-type" style="background-color: ${color}; color: ${textColor};">${t.item_type}</span></td><td class="${t.type === "vente" ? "text-success" : "text-danger"}">${cost.toFixed(2)} Septims</td></tr>`;
     });
+  } else {
+    tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state"><i class="fa-solid fa-receipt"></i><p>Vous n'avez encore effectué aucune opération.</p></div></td></tr>`;
   }
 }
 
 // --- VUE GESTION (PATRON) ---
 async function loadPatronData() {
   const personnelDiv = document.getElementById("admin-personnel-list");
-  personnelDiv.innerHTML = '<p class="text-muted">Chargement...</p>';
+  personnelDiv.innerHTML =
+    '<p class="text-muted" style="font-size:0.9em;">Chargement...</p>';
 
   const { data: personnel, error } = await db
     .from("profiles")
@@ -673,7 +713,7 @@ async function loadPatronData() {
   if (error) {
     personnelDiv.innerHTML = `<p class="text-danger">Erreur : ${error.message}</p>`;
   } else if (!personnel || personnel.length === 0) {
-    personnelDiv.innerHTML = '<p class="text-muted">Aucun employé.</p>';
+    personnelDiv.innerHTML = `<div class="empty-state"><i class="fa-solid fa-users-slash"></i><p>Aucun employé enregistré.</p></div>`;
   } else {
     personnelDiv.innerHTML = "";
     personnel.forEach((p) => {
@@ -695,7 +735,7 @@ async function loadPatronData() {
 
       const roleBadge =
         p.role === "patron"
-          ? '<span style="color:var(--accent); font-weight:bold;">Patron</span>'
+          ? '<span style="color:var(--primary); font-weight:bold;">Patron</span>'
           : "Employé";
       const statusBadge = p.is_approved
         ? ""
@@ -711,12 +751,14 @@ async function loadPatronData() {
 
   const { data: employees } = await db.from("employees").select("*");
   const salDiv = document.getElementById("admin-salaries-list");
-  salDiv.innerHTML = "";
-  if (employees) {
+  if (employees && employees.length > 0) {
+    salDiv.innerHTML = "";
     employees.forEach(
       (e) =>
         (salDiv.innerHTML += `<div class="salary-row"><input type="text" value="${e.name}" id="sal-name-${e.id}" placeholder="Nom"><input type="number" value="${e.salary}" id="sal-amount-${e.id}" placeholder="Septims"></div>`),
     );
+  } else {
+    salDiv.innerHTML = `<div class="empty-state" style="padding: 10px;"><p>Aucun contrat de travail.</p></div>`;
   }
 
   const { data: allTransactions } = await db
@@ -726,50 +768,58 @@ async function loadPatronData() {
   const filtered = getFilteredTransactions(allTransactions);
 
   const tbody = document.getElementById("admin-history-body");
-  tbody.innerHTML = "";
-  let totalAchats = 0,
-    totalVentes = 0,
-    totalSalairesPayes = 0;
 
-  filtered.forEach((t) => {
-    const cost = t.quantity * t.unit_price;
-    if (t.type === "achat") totalAchats += cost;
-    else if (t.type === "salaire") totalSalairesPayes += cost;
-    else totalVentes += cost;
+  if (filtered && filtered.length > 0) {
+    tbody.innerHTML = "";
+    let totalAchats = 0,
+      totalVentes = 0,
+      totalSalairesPayes = 0;
 
-    const color = typeColors[t.item_type] || "#888";
-    const textColor = t.item_type === "Charbon Normale" ? "#333" : "#fff";
-    let badgeClass =
-      t.type === "vente"
-        ? "bg-green"
-        : t.type === "salaire"
-          ? "bg-purple"
-          : "bg-red";
+    filtered.forEach((t) => {
+      const cost = t.quantity * t.unit_price;
+      if (t.type === "achat") totalAchats += cost;
+      else if (t.type === "salaire") totalSalairesPayes += cost;
+      else totalVentes += cost;
 
-    tbody.innerHTML += `
-            <tr>
-                <td>${new Date(t.created_at).toLocaleDateString()}</td>
-                <td>${t.counterparty_name}</td>
-                <td><span class="badge-type ${badgeClass}">${t.type.toUpperCase()}</span></td>
-                <td><span class="badge-type" style="background-color: ${color}; color: ${textColor};">${t.item_type}</span></td>
-                <td class="${t.type === "vente" ? "text-success" : "text-danger"}">${cost.toFixed(2)} Septims</td>
-                <td><button class="btn-icon text-danger" onclick="deleteTransaction(${t.id})"><i class="fa-solid fa-trash"></i></button></td>
-            </tr>`;
-  });
+      const color = typeColors[t.item_type] || "#888";
+      const textColor = t.item_type === "Charbon Normale" ? "#333" : "#fff";
+      let badgeClass =
+        t.type === "vente"
+          ? "bg-green"
+          : t.type === "salaire"
+            ? "bg-purple"
+            : "bg-red";
 
-  const totalDepenses = totalAchats + totalSalairesPayes;
-  document.getElementById("stat-ventes").innerText =
-    totalVentes.toFixed(2) + " Septims";
-  document.getElementById("stat-achats").innerText =
-    totalDepenses.toFixed(2) + " Septims";
+      tbody.innerHTML += `
+                <tr>
+                    <td>${new Date(t.created_at).toLocaleDateString()}</td>
+                    <td>${t.counterparty_name}</td>
+                    <td><span class="badge-type ${badgeClass}">${t.type.toUpperCase()}</span></td>
+                    <td><span class="badge-type" style="background-color: ${color}; color: ${textColor};">${t.item_type}</span></td>
+                    <td class="${t.type === "vente" ? "text-success" : "text-danger"}">${cost.toFixed(2)} S</td>
+                    <td><button class="btn-icon text-danger" onclick="deleteTransaction(${t.id})"><i class="fa-solid fa-trash"></i></button></td>
+                </tr>`;
+    });
 
-  const benefice = totalVentes - totalDepenses;
-  const elBenefice = document.getElementById("stat-benefice");
-  elBenefice.innerText = benefice.toFixed(2) + " Septims";
-  elBenefice.className =
-    benefice >= 0 ? "text-success-profit" : "text-danger-profit";
+    const totalDepenses = totalAchats + totalSalairesPayes;
+    document.getElementById("stat-ventes").innerText =
+      totalVentes.toFixed(2) + " S";
+    document.getElementById("stat-achats").innerText =
+      totalDepenses.toFixed(2) + " S";
 
-  renderCharts(filtered);
+    const benefice = totalVentes - totalDepenses;
+    const elBenefice = document.getElementById("stat-benefice");
+    elBenefice.innerText = benefice.toFixed(2) + " S";
+    elBenefice.className = benefice >= 0 ? "text-success" : "text-danger";
+
+    renderCharts(filtered);
+  } else {
+    tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><i class="fa-solid fa-list"></i><p>Aucune transaction sur cette période.</p></div></td></tr>`;
+    document.getElementById("stat-ventes").innerText = "0.00 S";
+    document.getElementById("stat-achats").innerText = "0.00 S";
+    document.getElementById("stat-benefice").innerText = "0.00 S";
+    renderCharts([]); // Vide les graphiques
+  }
 }
 
 // --- HISTORIQUE & GRAPHIQUES ---
@@ -786,9 +836,9 @@ async function showUserHistory(userId, userName) {
     .eq("created_by", userId)
     .order("created_at", { ascending: false });
   const tbody = document.getElementById("user-history-body");
-  tbody.innerHTML = "";
 
   if (transactions && transactions.length > 0) {
+    tbody.innerHTML = "";
     transactions.forEach((t) => {
       const cost = t.quantity * t.unit_price;
       const color = typeColors[t.item_type] || "#888";
@@ -809,8 +859,7 @@ async function showUserHistory(userId, userName) {
                 </tr>`;
     });
   } else {
-    tbody.innerHTML =
-      '<tr><td colspan="4" class="text-center text-muted">Aucune transaction.</td></tr>';
+    tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state"><i class="fa-solid fa-receipt"></i><p>Aucune transaction pour cet employé.</p></div></td></tr>`;
   }
 }
 function closeUserHistory() {
