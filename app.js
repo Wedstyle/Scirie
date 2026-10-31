@@ -1,19 +1,15 @@
-// ==========================================
-// CONFIGURATION SUPABASE
-// ==========================================
 const SUPABASE_URL = "https://ifbvulvyhledklktzjrv.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlmYnZ1bHZ5aGxlZGtsa3R6anJ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMzOTE4OTUsImV4cCI6MjEwODk2Nzg5NX0.V0RQSqrZWVUIXprRjy5z5ax-4e8MT51yclDgpbf0oSc";
 
 const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// ==========================================
-// VARIABLES GLOBALES
-// ==========================================
 let currentUser = null;
 let userProfile = null;
 let chartAchatsInstance = null;
 let chartVentesInstance = null;
+let currentPeriod = "all";
+let currentBarrelToAllocate = null;
 
 const basePricesVente = {
   "Petit bois": 0.2,
@@ -22,7 +18,6 @@ const basePricesVente = {
   "Briquettes de Charbon": 4.0,
   "Coke de charbon": 6.0,
 };
-
 const basePricesAchat = {
   "Petit bois": 0.0,
   "Charbon Pauvre": 0.3,
@@ -30,7 +25,6 @@ const basePricesAchat = {
   "Briquettes de Charbon": 3.0,
   "Coke de charbon": 5.0,
 };
-
 const typeColors = {
   "Petit bois": "#8B4513",
   "Charbon Pauvre": "#5a5a5a",
@@ -38,19 +32,31 @@ const typeColors = {
   "Briquettes de Charbon": "#2E8B57",
   "Coke de charbon": "#1E90FF",
   Salaire: "#8e44ad",
+  "Location tonneau": "#d4af37",
+  "Location four": "#e67e22",
 };
 
-// ==========================================
-// UI HELPERS
-// ==========================================
+// --- UI HELPERS ---
 function showPopup(title, message) {
   document.getElementById("popup-title").innerText = title;
   document.getElementById("popup-message").innerText = message;
   document.getElementById("custom-popup").style.display = "flex";
 }
-
 function closePopup() {
   document.getElementById("custom-popup").style.display = "none";
+}
+
+let confirmCallback = null;
+function showConfirm(title, message, callback) {
+  document.getElementById("confirm-title").innerText = title;
+  document.getElementById("confirm-message").innerText = message;
+  confirmCallback = callback;
+  document.getElementById("confirm-modal").style.display = "flex";
+}
+function closeConfirm(result) {
+  document.getElementById("confirm-modal").style.display = "none";
+  if (result && confirmCallback) confirmCallback();
+  confirmCallback = null;
 }
 
 function toggleAuth(type) {
@@ -71,9 +77,34 @@ function switchTab(tabId, btnElement) {
   if (btnElement) btnElement.classList.add("active");
 }
 
-// ==========================================
-// AUTHENTIFICATION
-// ==========================================
+// --- GESTION DES PÉRIODES ---
+function changePeriod(val) {
+  currentPeriod = val;
+  loadPatronData();
+}
+
+function getFilteredTransactions(transactions) {
+  if (currentPeriod === "all" || !transactions) return transactions || [];
+
+  const now = new Date();
+  const todayStr = now.toISOString().split("T")[0];
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(now.getDate() - 7);
+  sevenDaysAgo.setHours(0, 0, 0, 0);
+  const currentMonth = now.getMonth();
+  const currentYear = now.getFullYear();
+
+  return transactions.filter((t) => {
+    const d = new Date(t.created_at);
+    if (currentPeriod === "today") return t.created_at.startsWith(todayStr);
+    if (currentPeriod === "week") return d >= sevenDaysAgo;
+    if (currentPeriod === "month")
+      return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+    return true;
+  });
+}
+
+// --- AUTHENTIFICATION ---
 async function register() {
   const pseudo = document.getElementById("reg-pseudo").value.trim();
   const password = document.getElementById("reg-password").value;
@@ -116,9 +147,7 @@ async function logout() {
   location.reload();
 }
 
-// ==========================================
-// INITIALISATION & RÔLES
-// ==========================================
+// --- INITIALISATION & RÔLES ---
 async function checkUserStatus() {
   let { data: profile } = await db
     .from("profiles")
@@ -145,12 +174,18 @@ async function checkUserStatus() {
   document.getElementById("pending-screen").style.display = "none";
   document.getElementById("app-screen").style.display = "block";
 
+  // Tout le monde voit la location de four
+  document.getElementById("nav-four").style.display = "flex";
+
   if (profile.role === "patron") {
     document.getElementById("nav-historique").style.display = "none";
     document.getElementById("nav-gestion").style.display = "flex";
+    document.getElementById("nav-location").style.display = "flex";
     switchTab("tab-gestion", document.getElementById("nav-gestion"));
     loadPatronData();
     loadEmployeData();
+    loadBarrels();
+    loadFurnaces();
   } else {
     if (!profile.is_approved) {
       document.getElementById("app-screen").style.display = "none";
@@ -159,8 +194,10 @@ async function checkUserStatus() {
     }
     document.getElementById("nav-historique").style.display = "flex";
     document.getElementById("nav-gestion").style.display = "none";
+    document.getElementById("nav-location").style.display = "none";
     switchTab("tab-commandes", document.querySelector(".nav-btn"));
     loadEmployeData();
+    loadFurnaces();
   }
 
   loadStock();
@@ -168,9 +205,259 @@ async function checkUserStatus() {
   updateBasePrice();
 }
 
-// ==========================================
-// GESTION DES COMMANDES
-// ==========================================
+// --- LOCATION DE TONNEAUX (PATRON) ---
+async function loadBarrels() {
+  const { data: rentals } = await db.from("barrel_rentals").select("*");
+  for (let i = 1; i <= 22; i++) {
+    const card = document.getElementById(`barrel-${i}`);
+    if (!card) continue;
+    const rental = rentals ? rentals.find((r) => r.barrel_number === i) : null;
+    card.className = "barrel-card free";
+    const statusEl = card.querySelector(".status-badge");
+    const clientEl = card.querySelector(".client-name");
+    const payInfoEl = card.querySelector(".pay-info");
+    const actionsEl = card.querySelector(".barrel-actions");
+
+    if (rental) {
+      clientEl.innerHTML = `<i class="fa-solid fa-user"></i> ${rental.client_name}`;
+      if (rental.last_payment_date) {
+        const lastPay = new Date(rental.last_payment_date);
+        const nextPay = new Date(lastPay);
+        nextPay.setDate(nextPay.getDate() + 7);
+        const now = new Date();
+        const diffDays = Math.ceil(
+          (nextPay.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
+        );
+        const options = { day: "2-digit", month: "2-digit", year: "numeric" };
+
+        if (diffDays < 0) {
+          card.classList.add("late");
+          statusEl.innerText = "En retard";
+          payInfoEl.innerHTML = `<span>Dernier : ${lastPay.toLocaleDateString("fr-FR", options)}</span><span class="next-pay-date">Dû le : ${nextPay.toLocaleDateString("fr-FR", options)}</span><span style="color: var(--danger); font-weight: bold;">Retard de ${Math.abs(diffDays)}j</span>`;
+        } else {
+          card.classList.add("paid");
+          statusEl.innerText = "À jour";
+          payInfoEl.innerHTML = `<span>Dernier : ${lastPay.toLocaleDateString("fr-FR", options)}</span><span class="next-pay-date">Prochain : <strong>${nextPay.toLocaleDateString("fr-FR", options)}</strong></span><span>Dans ${diffDays}j</span>`;
+        }
+      } else {
+        card.classList.add("late");
+        statusEl.innerText = "Jamais payé";
+        payInfoEl.innerHTML = `<span style="color: var(--danger);">Aucun paiement</span>`;
+      }
+      actionsEl.innerHTML = `<button class="btn-pay" onclick="payBarrel(${rental.id}, ${i}, '${rental.client_name}')"><i class="fa-solid fa-coins"></i> Encaisser 50</button><button class="btn-free" onclick="freeBarrel(${rental.id})"><i class="fa-solid fa-trash"></i> Libérer</button>`;
+    } else {
+      clientEl.innerHTML = "";
+      payInfoEl.innerHTML = "";
+      statusEl.innerText = "Libre";
+      actionsEl.innerHTML = `<button class="btn-allocate" onclick="allocateBarrel(${i})"><i class="fa-solid fa-plus"></i> Allouer</button>`;
+    }
+  }
+}
+
+function allocateBarrel(num) {
+  currentBarrelToAllocate = num;
+  document.getElementById("allocate-barrel-title").innerText =
+    `Tonneau n°${num}`;
+  document.getElementById("allocate-client-name").value = "";
+  document.getElementById("allocate-barrel-modal").style.display = "flex";
+  setTimeout(
+    () => document.getElementById("allocate-client-name").focus(),
+    100,
+  );
+}
+function closeAllocateModal() {
+  document.getElementById("allocate-barrel-modal").style.display = "none";
+  currentBarrelToAllocate = null;
+}
+async function confirmAllocateBarrel() {
+  const clientName = document
+    .getElementById("allocate-client-name")
+    .value.trim();
+  if (!clientName)
+    return showPopup("Erreur", "Veuillez entrer un nom de client.");
+  if (!currentBarrelToAllocate) return;
+  const { error } = await db
+    .from("barrel_rentals")
+    .insert({
+      barrel_number: currentBarrelToAllocate,
+      client_name: clientName,
+    });
+  if (error) showPopup("Erreur", error.message);
+  else {
+    showPopup("Succès", `Tonneau n°${currentBarrelToAllocate} alloué.`);
+    closeAllocateModal();
+    loadBarrels();
+  }
+}
+async function payBarrel(id, num, clientName) {
+  showConfirm(
+    "Encaisser",
+    `Encaisser 50 Septims pour le tonneau n°${num} ?`,
+    async () => {
+      const { error: errRental } = await db
+        .from("barrel_rentals")
+        .update({ last_payment_date: new Date().toISOString() })
+        .eq("id", id);
+      if (errRental) return showPopup("Erreur", "Erreur.");
+      await db
+        .from("transactions")
+        .insert({
+          type: "vente",
+          item_type: "Location tonneau",
+          counterparty_name: clientName,
+          quantity: 1,
+          unit_price: 50,
+          created_by: currentUser.id,
+        });
+      showPopup("Payé", `50 Septims encaissés.`);
+      loadBarrels();
+      loadPatronData();
+      if (userProfile.role !== "patron") loadEmployeData();
+    },
+  );
+}
+async function freeBarrel(id) {
+  showConfirm(
+    "Libérer",
+    "Voulez-vous vraiment libérer ce tonneau ?",
+    async () => {
+      await db.from("barrel_rentals").delete().eq("id", id);
+      loadBarrels();
+    },
+  );
+}
+
+// --- LOCATION DE FOUR (EMPLOYÉS & PATRON) ---
+async function loadFurnaces() {
+  const { data: furnaces } = await db
+    .from("furnace_rentals")
+    .select("*")
+    .order("created_at", { ascending: true });
+  const container = document.getElementById("furnaces-container");
+  container.innerHTML = "";
+
+  if (furnaces && furnaces.length > 0) {
+    furnaces.forEach((f) => {
+      let cardClass = "free";
+      let statusText = "Libre";
+      let payInfo = "";
+      let actionsHtml = "";
+
+      if (f.last_payment_date) {
+        const lastPay = new Date(f.last_payment_date);
+        const nextPay = new Date(lastPay);
+        nextPay.setDate(nextPay.getDate() + 7);
+        const now = new Date();
+        const diffDays = Math.ceil(
+          (nextPay.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
+        );
+        const options = { day: "2-digit", month: "2-digit", year: "numeric" };
+
+        if (diffDays < 0) {
+          cardClass = "late";
+          statusText = "En retard";
+          payInfo = `<span>Dernier : ${lastPay.toLocaleDateString("fr-FR", options)}</span><span class="next-pay-date">Dû le : ${nextPay.toLocaleDateString("fr-FR", options)}</span><span style="color: var(--danger); font-weight: bold;">Retard de ${Math.abs(diffDays)}j</span>`;
+        } else {
+          cardClass = "paid";
+          statusText = "À jour";
+          payInfo = `<span>Dernier : ${lastPay.toLocaleDateString("fr-FR", options)}</span><span class="next-pay-date">Prochain : <strong>${nextPay.toLocaleDateString("fr-FR", options)}</strong></span><span>Dans ${diffDays}j</span>`;
+        }
+      } else {
+        cardClass = "late";
+        statusText = "Jamais payé";
+        payInfo = `<span style="color: var(--danger);">Aucun paiement</span>`;
+      }
+
+      // Seul le patron peut libérer un four, tout le monde peut encaisser
+      actionsHtml = `<button class="btn-pay" onclick="payFurnace(${f.id}, '${f.client_name}')"><i class="fa-solid fa-coins"></i> Encaisser 30</button>`;
+      if (userProfile.role === "patron") {
+        actionsHtml += `<button class="btn-free" onclick="freeFurnace(${f.id})"><i class="fa-solid fa-trash"></i> Libérer</button>`;
+      }
+
+      container.innerHTML += `
+                <div class="barrel-card ${cardClass}">
+                    <div class="barrel-header"><h3>Four</h3><span class="status-badge">${statusText}</span></div>
+                    <div class="barrel-body">
+                        <div class="client-name"><i class="fa-solid fa-user"></i> ${f.client_name}</div>
+                        <div class="pay-info">${payInfo}</div>
+                    </div>
+                    <div class="barrel-actions">${actionsHtml}</div>
+                </div>
+            `;
+    });
+  } else {
+    container.innerHTML =
+      '<p class="text-muted">Aucun client pour le moment.</p>';
+  }
+}
+
+function openFurnaceModal() {
+  document.getElementById("furnace-client-name").value = "";
+  document.getElementById("create-furnace-modal").style.display = "flex";
+  setTimeout(() => document.getElementById("furnace-client-name").focus(), 100);
+}
+function closeFurnaceModal() {
+  document.getElementById("create-furnace-modal").style.display = "none";
+}
+
+async function confirmCreateFurnace() {
+  const clientName = document
+    .getElementById("furnace-client-name")
+    .value.trim();
+  if (!clientName)
+    return showPopup("Erreur", "Veuillez entrer un nom de client.");
+
+  const { error } = await db
+    .from("furnace_rentals")
+    .insert({ client_name: clientName, created_by: currentUser.id });
+  if (error) showPopup("Erreur", error.message);
+  else {
+    showPopup("Succès", `Client ${clientName} ajouté pour le four.`);
+    closeFurnaceModal();
+    loadFurnaces();
+  }
+}
+
+async function payFurnace(id, clientName) {
+  showConfirm(
+    "Encaisser",
+    `Encaisser 30 Septims pour le four (${clientName}) ?`,
+    async () => {
+      const { error: errFurnace } = await db
+        .from("furnace_rentals")
+        .update({ last_payment_date: new Date().toISOString() })
+        .eq("id", id);
+      if (errFurnace) return showPopup("Erreur", "Impossible.");
+
+      await db.from("transactions").insert({
+        type: "vente",
+        item_type: "Location four",
+        counterparty_name: clientName,
+        quantity: 1,
+        unit_price: 30,
+        created_by: currentUser.id,
+      });
+
+      showPopup("Payé", `30 Septims encaissés. Prochain paiement dans 7j.`);
+      loadFurnaces();
+      if (userProfile.role === "patron") loadPatronData();
+      loadEmployeData();
+    },
+  );
+}
+
+async function freeFurnace(id) {
+  showConfirm(
+    "Libérer",
+    "Voulez-vous vraiment supprimer ce client du four ?",
+    async () => {
+      await db.from("furnace_rentals").delete().eq("id", id);
+      loadFurnaces();
+    },
+  );
+}
+
+// --- COMMANDES & STOCK ---
 async function createOrder(e) {
   e.preventDefault();
   const client_name = document.getElementById("ord-client").value.trim();
@@ -205,7 +492,6 @@ async function loadOrders() {
     .order("created_at", { ascending: true });
   const container = document.getElementById("orders-container");
   container.innerHTML = "";
-
   if (orders && orders.length > 0) {
     orders.forEach((o) => {
       const color = typeColors[o.item_type] || "#888";
@@ -213,7 +499,6 @@ async function loadOrders() {
       let dateHtml = o.deadline
         ? `<span class="text-warning" style="display:block; margin-top:8px;"><i class="fa-solid fa-clock"></i> Avant le : ${new Date(o.deadline).toLocaleDateString()}</span>`
         : "";
-
       container.innerHTML += `
                 <div class="order-card" style="border-left-color: ${color};">
                     <div><h4>${o.item_type}</h4><div class="client">Client : ${o.client_name}</div>
@@ -226,8 +511,7 @@ async function loadOrders() {
                 </div>`;
     });
   } else {
-    container.innerHTML =
-      '<p class="text-muted">Aucune commande en attente.</p>';
+    container.innerHTML = '<p class="text-muted">Aucune commande.</p>';
   }
 }
 
@@ -240,9 +524,8 @@ async function honorOrder(id, client_name, item_type, quantity, unit_price) {
   if (stock && stock.quantity < quantity)
     return showPopup(
       "Stock Insuffisant",
-      `Il n'y a que ${stock.quantity} ${item_type} en stock.`,
+      `Il n'y a que ${stock.quantity} ${item_type}.`,
     );
-
   const { error: tErr } = await db
     .from("transactions")
     .insert({
@@ -254,9 +537,7 @@ async function honorOrder(id, client_name, item_type, quantity, unit_price) {
       created_by: currentUser.id,
     });
   if (tErr) return showPopup("Erreur", tErr.message);
-
   await db.from("orders").delete().eq("id", id);
-
   showPopup("Commande Honorée", "Vente enregistrée !");
   loadOrders();
   loadStock();
@@ -265,19 +546,16 @@ async function honorOrder(id, client_name, item_type, quantity, unit_price) {
 }
 
 async function cancelOrder(id) {
-  if (!confirm("Annuler cette commande ?")) return;
-  await db.from("orders").delete().eq("id", id);
-  loadOrders();
+  showConfirm("Annuler", "Annuler cette commande ?", async () => {
+    await db.from("orders").delete().eq("id", id);
+    loadOrders();
+  });
 }
 
-// ==========================================
-// GESTION DU STOCK
-// ==========================================
 async function loadStock() {
   const { data: stocks } = await db.from("stocks").select("*").order("id");
   const container = document.getElementById("stock-container");
   container.innerHTML = "";
-
   if (stocks) {
     stocks.forEach((s) => {
       const color = typeColors[s.item_name] || "#888";
@@ -286,7 +564,6 @@ async function loadStock() {
         userProfile.role === "patron"
           ? `<input type="number" value="${s.quantity}" onchange="updateStockManual(${s.id}, this.value)">`
           : `<div class="qty">${s.quantity}</div>`;
-
       container.innerHTML += `<div class="stock-item" style="border-left-color: ${color};"><h4 style="background-color: ${color}; color: ${textColor};">${s.item_name}</h4>${qtyHtml}</div>`;
     });
   }
@@ -299,26 +576,21 @@ async function updateStockManual(id, newQty) {
     .eq("id", id);
 }
 
-// ==========================================
-// SAISIE DIRECTE
-// ==========================================
+// --- SAISIE DIRECTE ---
 function updateBasePrice() {
   const type = document.getElementById("emp-type").value;
   const select = document.getElementById("emp-item");
   const item = select.value;
   let price =
     type === "vente" ? basePricesVente[item] || 0 : basePricesAchat[item] || 0;
-
   document.getElementById("emp-price").value = price.toFixed(2);
   select.style.backgroundColor = typeColors[item] || "#333";
   select.style.color = item === "Charbon Normale" ? "#333" : "#fff";
-
   calcEmpTotal();
 }
 
 document.getElementById("emp-quantity").addEventListener("input", calcEmpTotal);
 document.getElementById("emp-price").addEventListener("input", calcEmpTotal);
-
 function calcEmpTotal() {
   const q = parseFloat(document.getElementById("emp-quantity").value) || 0;
   const p = parseFloat(document.getElementById("emp-price").value) || 0;
@@ -341,7 +613,7 @@ async function addTransaction(e) {
     if (stock && stock.quantity < quantity)
       return showPopup(
         "Stock Insuffisant",
-        `Il ne reste que ${stock.quantity} ${item_type}.`,
+        `Il ne reste que ${stock.quantity}.`,
       );
   }
 
@@ -355,7 +627,6 @@ async function addTransaction(e) {
       unit_price,
       created_by: currentUser.id,
     });
-
   if (error) showPopup("Erreur", error.message);
   else {
     showPopup("Succès", "Opération enregistrée !");
@@ -373,7 +644,6 @@ async function loadEmployeData() {
     .order("created_at", { ascending: false });
   const tbody = document.getElementById("emp-history-body");
   tbody.innerHTML = "";
-
   if (data) {
     data.forEach((t) => {
       const cost = t.quantity * t.unit_price;
@@ -385,26 +655,15 @@ async function loadEmployeData() {
           : t.type === "salaire"
             ? "bg-purple"
             : "bg-red";
-
-      tbody.innerHTML += `
-                <tr>
-                    <td>${new Date(t.created_at).toLocaleDateString()}</td>
-                    <td><span class="badge-type ${badgeClass}">${t.type.toUpperCase()}</span></td>
-                    <td><span class="badge-type" style="background-color: ${color}; color: ${textColor};">${t.item_type}</span></td>
-                    <td class="${t.type === "vente" ? "text-success" : "text-danger"}">${cost.toFixed(2)} Septims</td>
-                </tr>`;
+      tbody.innerHTML += `<tr><td>${new Date(t.created_at).toLocaleDateString()}</td><td><span class="badge-type ${badgeClass}">${t.type.toUpperCase()}</span></td><td><span class="badge-type" style="background-color: ${color}; color: ${textColor};">${t.item_type}</span></td><td class="${t.type === "vente" ? "text-success" : "text-danger"}">${cost.toFixed(2)} Septims</td></tr>`;
     });
   }
 }
 
-// ==========================================
-// VUE GESTION (PATRON)
-// ==========================================
+// --- VUE GESTION (PATRON) ---
 async function loadPatronData() {
-  // 1. Gestion du Personnel
   const personnelDiv = document.getElementById("admin-personnel-list");
-  personnelDiv.innerHTML =
-    '<p class="text-muted">Chargement du personnel...</p>';
+  personnelDiv.innerHTML = '<p class="text-muted">Chargement...</p>';
 
   const { data: personnel, error } = await db
     .from("profiles")
@@ -412,11 +671,9 @@ async function loadPatronData() {
     .order("created_at", { ascending: true });
 
   if (error) {
-    console.error("Erreur chargement personnel:", error);
     personnelDiv.innerHTML = `<p class="text-danger">Erreur : ${error.message}</p>`;
   } else if (!personnel || personnel.length === 0) {
-    personnelDiv.innerHTML =
-      '<p class="text-muted">Aucun employé enregistré.</p>';
+    personnelDiv.innerHTML = '<p class="text-muted">Aucun employé.</p>';
   } else {
     personnelDiv.innerHTML = "";
     personnel.forEach((p) => {
@@ -424,15 +681,15 @@ async function loadPatronData() {
       let actionHtml = "";
 
       if (p.is_approved) {
-        actionHtml = `<button class="btn-action btn-fire" onclick="virerUtilisateur('${p.id}', '${p.full_name}')" ${isMe ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : ""}><i class="fa-solid fa-trash"></i> Virer</button>`;
+        actionHtml = `<button class="btn-action btn-fire" onclick="event.stopPropagation(); virerUtilisateur('${p.id}', '${p.full_name}')" ${isMe ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : ""}><i class="fa-solid fa-trash"></i></button>`;
       } else {
-        actionHtml = `<button class="btn-action btn-validate" onclick="validerUtilisateur('${p.id}')"><i class="fa-solid fa-check"></i> Valider</button>
-                              <button class="btn-action btn-fire" onclick="virerUtilisateur('${p.id}', '${p.full_name}')"><i class="fa-solid fa-trash"></i> Refuser</button>`;
+        actionHtml = `<button class="btn-action btn-validate" onclick="event.stopPropagation(); validerUtilisateur('${p.id}')"><i class="fa-solid fa-check"></i></button>
+                              <button class="btn-action btn-fire" onclick="event.stopPropagation(); virerUtilisateur('${p.id}', '${p.full_name}')"><i class="fa-solid fa-trash"></i></button>`;
       }
 
       if (p.role === "employe" && p.is_approved) {
         actionHtml =
-          `<button class="btn-action btn-promote" onclick="promouvoirUtilisateur('${p.id}')"><i class="fa-solid fa-arrow-up"></i> Promouvoir</button>` +
+          `<button class="btn-action btn-promote" onclick="event.stopPropagation(); promouvoirUtilisateur('${p.id}')"><i class="fa-solid fa-arrow-up"></i></button>` +
           actionHtml;
       }
 
@@ -445,14 +702,13 @@ async function loadPatronData() {
         : '<span style="color:var(--danger); font-weight:bold;">(En attente)</span>';
 
       personnelDiv.innerHTML += `
-                <div class="personnel-row">
+                <div class="personnel-row" style="cursor: pointer;" onclick="showUserHistory('${p.id}', '${p.full_name}')">
                     <div class="personnel-info"><strong>${p.full_name} ${isMe ? "(Vous)" : ""}</strong><span>Rôle : ${roleBadge} ${statusBadge}</span></div>
                     <div class="personnel-actions">${actionHtml}</div>
                 </div>`;
     });
   }
 
-  // 2. Salaires
   const { data: employees } = await db.from("employees").select("*");
   const salDiv = document.getElementById("admin-salaries-list");
   salDiv.innerHTML = "";
@@ -463,24 +719,78 @@ async function loadPatronData() {
     );
   }
 
-  // 3. Transactions Globales
-  const { data: transactions } = await db
+  const { data: allTransactions } = await db
     .from("transactions")
     .select("*")
     .order("created_at", { ascending: false });
+  const filtered = getFilteredTransactions(allTransactions);
+
   const tbody = document.getElementById("admin-history-body");
   tbody.innerHTML = "";
   let totalAchats = 0,
     totalVentes = 0,
     totalSalairesPayes = 0;
 
-  if (transactions) {
+  filtered.forEach((t) => {
+    const cost = t.quantity * t.unit_price;
+    if (t.type === "achat") totalAchats += cost;
+    else if (t.type === "salaire") totalSalairesPayes += cost;
+    else totalVentes += cost;
+
+    const color = typeColors[t.item_type] || "#888";
+    const textColor = t.item_type === "Charbon Normale" ? "#333" : "#fff";
+    let badgeClass =
+      t.type === "vente"
+        ? "bg-green"
+        : t.type === "salaire"
+          ? "bg-purple"
+          : "bg-red";
+
+    tbody.innerHTML += `
+            <tr>
+                <td>${new Date(t.created_at).toLocaleDateString()}</td>
+                <td>${t.counterparty_name}</td>
+                <td><span class="badge-type ${badgeClass}">${t.type.toUpperCase()}</span></td>
+                <td><span class="badge-type" style="background-color: ${color}; color: ${textColor};">${t.item_type}</span></td>
+                <td class="${t.type === "vente" ? "text-success" : "text-danger"}">${cost.toFixed(2)} Septims</td>
+                <td><button class="btn-icon text-danger" onclick="deleteTransaction(${t.id})"><i class="fa-solid fa-trash"></i></button></td>
+            </tr>`;
+  });
+
+  const totalDepenses = totalAchats + totalSalairesPayes;
+  document.getElementById("stat-ventes").innerText =
+    totalVentes.toFixed(2) + " Septims";
+  document.getElementById("stat-achats").innerText =
+    totalDepenses.toFixed(2) + " Septims";
+
+  const benefice = totalVentes - totalDepenses;
+  const elBenefice = document.getElementById("stat-benefice");
+  elBenefice.innerText = benefice.toFixed(2) + " Septims";
+  elBenefice.className =
+    benefice >= 0 ? "text-success-profit" : "text-danger-profit";
+
+  renderCharts(filtered);
+}
+
+// --- HISTORIQUE & GRAPHIQUES ---
+async function showUserHistory(userId, userName) {
+  document.getElementById("user-history-title").innerText =
+    `Historique de ${userName}`;
+  document.getElementById("user-history-body").innerHTML =
+    '<tr><td colspan="4" class="text-center">Chargement...</td></tr>';
+  document.getElementById("user-history-modal").style.display = "flex";
+
+  const { data: transactions } = await db
+    .from("transactions")
+    .select("*")
+    .eq("created_by", userId)
+    .order("created_at", { ascending: false });
+  const tbody = document.getElementById("user-history-body");
+  tbody.innerHTML = "";
+
+  if (transactions && transactions.length > 0) {
     transactions.forEach((t) => {
       const cost = t.quantity * t.unit_price;
-      if (t.type === "achat") totalAchats += cost;
-      else if (t.type === "salaire") totalSalairesPayes += cost;
-      else totalVentes += cost;
-
       const color = typeColors[t.item_type] || "#888";
       const textColor = t.item_type === "Charbon Normale" ? "#333" : "#fff";
       let badgeClass =
@@ -493,66 +803,18 @@ async function loadPatronData() {
       tbody.innerHTML += `
                 <tr>
                     <td>${new Date(t.created_at).toLocaleDateString()}</td>
-                    <td>${t.counterparty_name}</td>
                     <td><span class="badge-type ${badgeClass}">${t.type.toUpperCase()}</span></td>
                     <td><span class="badge-type" style="background-color: ${color}; color: ${textColor};">${t.item_type}</span></td>
                     <td class="${t.type === "vente" ? "text-success" : "text-danger"}">${cost.toFixed(2)} Septims</td>
-                    <td><button class="btn-icon text-danger" onclick="deleteTransaction(${t.id})"><i class="fa-solid fa-trash"></i></button></td>
                 </tr>`;
     });
+  } else {
+    tbody.innerHTML =
+      '<tr><td colspan="4" class="text-center text-muted">Aucune transaction.</td></tr>';
   }
-
-  // Calculs des totaux
-  const totalDepenses = totalAchats + totalSalairesPayes;
-  document.getElementById("stat-ventes").innerText =
-    totalVentes.toFixed(2) + " Septims";
-  document.getElementById("stat-achats").innerText =
-    totalDepenses.toFixed(2) + " Septims";
-
-  const now = new Date();
-  const todayStr = now.toISOString().split("T")[0];
-  const sevenDaysAgo = new Date();
-  sevenDaysAgo.setDate(now.getDate() - 7);
-  sevenDaysAgo.setHours(0, 0, 0, 0);
-  const currentMonth = now.getMonth();
-  const currentYear = now.getFullYear();
-
-  const calcProfit = (filteredTransactions) => {
-    let profit = 0;
-    filteredTransactions.forEach((t) => {
-      const cost = t.quantity * t.unit_price;
-      if (t.type === "vente") profit += cost;
-      else profit -= cost;
-    });
-    return profit;
-  };
-
-  if (transactions) {
-    const transJour = transactions.filter((t) =>
-      t.created_at.startsWith(todayStr),
-    );
-    const transSemaine = transactions.filter(
-      (t) => new Date(t.created_at) >= sevenDaysAgo,
-    );
-    const transMois = transactions.filter((t) => {
-      const d = new Date(t.created_at);
-      return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
-    });
-
-    const updateProfitElement = (id, value) => {
-      const el = document.getElementById(id);
-      el.innerText = value.toFixed(2) + " Septims";
-      el.className = value >= 0 ? "text-success-profit" : "text-danger-profit";
-    };
-
-    updateProfitElement("profit-jour", calcProfit(transJour));
-    updateProfitElement("profit-semaine", calcProfit(transSemaine));
-    updateProfitElement("profit-mois", calcProfit(transMois));
-    updateProfitElement("profit-total", calcProfit(transactions));
-    updateProfitElement("stat-benefice", calcProfit(transactions));
-
-    renderCharts(transactions);
-  }
+}
+function closeUserHistory() {
+  document.getElementById("user-history-modal").style.display = "none";
 }
 
 function renderCharts(transactions) {
@@ -569,6 +831,8 @@ function renderCharts(transactions) {
     "Charbon Normale": 0,
     "Briquettes de Charbon": 0,
     "Coke de charbon": 0,
+    "Location tonneau": 0,
+    "Location four": 0,
   };
 
   transactions.forEach((t) => {
@@ -625,75 +889,50 @@ function renderCharts(transactions) {
   });
 }
 
-// ==========================================
-// ACTIONS PATRON
-// ==========================================
+// --- ACTIONS PATRON ---
 async function validerUtilisateur(id) {
   const { error } = await db
     .from("profiles")
     .update({ is_approved: true })
     .eq("id", id);
-  if (error) showPopup("Erreur", "Impossible de valider.");
+  if (error) showPopup("Erreur", "Impossible.");
   else {
-    showPopup("Validé", "Le joueur peut maintenant travailler.");
+    showPopup("Validé", "Le joueur peut travailler.");
     loadPatronData();
   }
 }
-
 async function promouvoirUtilisateur(id) {
-  if (
-    !confirm(
-      "Voulez-vous vraiment nommer ce joueur Patron ? Il aura accès à toute la gestion.",
-    )
-  )
-    return;
-  const { error } = await db
-    .from("profiles")
-    .update({ role: "patron" })
-    .eq("id", id);
-  if (error) showPopup("Erreur", "Impossible de promouvoir.");
-  else {
-    showPopup("Promu", "Le joueur est maintenant Patron.");
-    loadPatronData();
-  }
-}
-
-async function virerUtilisateur(id, nom) {
-  if (
-    !confirm(
-      `Voulez-vous vraiment VIRER ${nom} ? Son compte sera définitivement supprimé.`,
-    )
-  )
-    return;
-
-  const { error } = await db.rpc("supprimer_utilisateur", {
-    target_user_id: id,
+  showConfirm("Promouvoir", "Nommer ce joueur Patron ?", async () => {
+    const { error } = await db
+      .from("profiles")
+      .update({ role: "patron" })
+      .eq("id", id);
+    if (error) showPopup("Erreur", "Impossible.");
+    else {
+      showPopup("Promu", "Le joueur est Patron.");
+      loadPatronData();
+    }
   });
-
-  if (error) {
-    console.error(error);
-    showPopup(
-      "Erreur",
-      "Impossible de virer. Avez-vous bien exécuté le code SQL ?",
-    );
-  } else {
-    showPopup("Viré", `${nom} a été supprimé de la base de données.`);
-    loadPatronData();
-  }
 }
-
+async function virerUtilisateur(id, nom) {
+  showConfirm("Virer", `VIRER ${nom} ?`, async () => {
+    const { error } = await db.rpc("supprimer_utilisateur", {
+      target_user_id: id,
+    });
+    if (error) showPopup("Erreur", "Erreur SQL.");
+    else {
+      showPopup("Viré", `${nom} supprimé.`);
+      loadPatronData();
+    }
+  });
+}
 async function deleteTransaction(id) {
-  if (
-    confirm(
-      "Supprimer cette transaction ? Attention, le stock ne sera pas recalculé automatiquement.",
-    )
-  ) {
+  showConfirm("Supprimer", "Supprimer cette transaction ?", async () => {
     await db.from("transactions").delete().eq("id", id);
     loadPatronData();
     loadEmployeData();
-  }
+  });
 }
-
 async function saveSalaries() {
   const updates = [];
   document.querySelectorAll('[id^="sal-name-"]').forEach((input) => {
@@ -706,51 +945,41 @@ async function saveSalaries() {
     });
   });
   await db.from("employees").upsert(updates);
-  showPopup("Sauvegardé", "Contrats de salaires mis à jour.");
+  showPopup("Sauvegardé", "Contrats mis à jour.");
   loadPatronData();
 }
-
 async function paySalaries() {
-  if (
-    !confirm(
-      "Confirmer le paiement de tous les salaires ? Cela va retirer l'argent de la trésorerie.",
-    )
-  )
-    return;
-
-  const { data: employees } = await db.from("employees").select("*");
-  const toPay = employees.filter((e) => e.salary > 0);
-
-  if (toPay.length === 0) return showPopup("Info", "Aucun salaire à payer.");
-
-  let totalPaye = 0;
-  const transactionsToInsert = toPay.map((e) => {
-    totalPaye += e.salary;
-    return {
-      type: "salaire",
-      item_type: "Salaire",
-      counterparty_name: e.name,
-      quantity: 1,
-      unit_price: e.salary,
-      created_by: currentUser.id,
-    };
+  showConfirm("Payer", "Payer tous les salaires ?", async () => {
+    const { data: employees } = await db.from("employees").select("*");
+    const toPay = employees.filter((e) => e.salary > 0);
+    if (toPay.length === 0) return showPopup("Info", "Aucun salaire.");
+    let totalPaye = 0;
+    const transactionsToInsert = toPay.map((e) => {
+      totalPaye += e.salary;
+      return {
+        type: "salaire",
+        item_type: "Salaire",
+        counterparty_name: e.name,
+        quantity: 1,
+        unit_price: e.salary,
+        created_by: currentUser.id,
+      };
+    });
+    const { error } = await db
+      .from("transactions")
+      .insert(transactionsToInsert);
+    if (error) showPopup("Erreur", error.message);
+    else {
+      showPopup(
+        "Salaires Payés",
+        `${totalPaye.toFixed(2)} Septims distribués.`,
+      );
+      loadPatronData();
+    }
   });
-
-  const { error } = await db.from("transactions").insert(transactionsToInsert);
-
-  if (error) showPopup("Erreur", "Erreur lors du paiement : " + error.message);
-  else {
-    showPopup(
-      "Salaires Payés",
-      `${totalPaye.toFixed(2)} Septims ont été distribués aux employés.`,
-    );
-    loadPatronData();
-  }
 }
 
-// ==========================================
-// DÉMARRAGE
-// ==========================================
+// --- DÉMARRAGE ---
 db.auth.getSession().then(({ data: { session } }) => {
   if (session) {
     currentUser = session.user;

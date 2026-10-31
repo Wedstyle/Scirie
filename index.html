@@ -5,12 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Scierie d'Anga RP - Gestion</title>
     <link rel="stylesheet" href="style.css" />
-    <!-- Icônes FontAwesome -->
     <link
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
     />
-    <!-- Librairie pour les graphiques -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   </head>
   <body>
@@ -18,7 +16,7 @@
     <div id="auth-screen" class="full-screen">
       <div class="auth-box">
         <h1><i class="fa-solid fa-tree"></i> Scierie d'Anga</h1>
-        <p class="subtitle">Système de Gestion</p>
+        <p class="subtitle">Système de Gestion RP</p>
 
         <div id="login-form">
           <h2>Pointage</h2>
@@ -117,6 +115,20 @@
             </button>
             <button class="nav-btn" onclick="switchTab('tab-saisie', this)">
               <i class="fa-solid fa-clipboard-list"></i> Saisie Directe
+            </button>
+            <button
+              class="nav-btn"
+              id="nav-location"
+              onclick="switchTab('tab-location', this)"
+            >
+              <i class="fa-solid fa-wine-bottle"></i> Location Tonneaux
+            </button>
+            <button
+              class="nav-btn"
+              id="nav-four"
+              onclick="switchTab('tab-four', this)"
+            >
+              <i class="fa-solid fa-fire"></i> Location Four
             </button>
             <button
               class="nav-btn"
@@ -279,6 +291,379 @@
             </div>
           </section>
 
+          <!-- ONGLET LOCATION DE TONNEAUX -->
+          <section id="tab-location" class="tab-content">
+            <h2 class="page-title">Location de Tonneaux</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px">
+              Tarif : <strong>50 Septims / semaine</strong>.
+            </p>
+
+            <div class="barrels-grid">
+              <div class="barrel-card free" id="barrel-1">
+                <div class="barrel-header">
+                  <h3>Tonneau n°1</h3>
+                  <span class="status-badge">Libre</span>
+                </div>
+                <div class="barrel-body">
+                  <div class="client-name"></div>
+                  <div class="pay-info"></div>
+                </div>
+                <div class="barrel-actions">
+                  <button class="btn-allocate" onclick="allocateBarrel(1)">
+                    Allouer
+                  </button>
+                </div>
+              </div>
+              <div class="barrel-card free" id="barrel-2">
+                <div class="barrel-header">
+                  <h3>Tonneau n°2</h3>
+                  <span class="status-badge">Libre</span>
+                </div>
+                <div class="barrel-body">
+                  <div class="client-name"></div>
+                  <div class="pay-info"></div>
+                </div>
+                <div class="barrel-actions">
+                  <button class="btn-allocate" onclick="allocateBarrel(2)">
+                    Allouer
+                  </button>
+                </div>
+              </div>
+              <div class="barrel-card free" id="barrel-3">
+                <div class="barrel-header">
+                  <h3>Tonneau n°3</h3>
+                  <span class="status-badge">Libre</span>
+                </div>
+                <div class="barrel-body">
+                  <div class="client-name"></div>
+                  <div class="pay-info"></div>
+                </div>
+                <div class="barrel-actions">
+                  <button class="btn-allocate" onclick="allocateBarrel(3)">
+                    Allouer
+                  </button>
+                </div>
+              </div>
+              <div class="barrel-card free" id="barrel-4">
+                <div class="barrel-header">
+                  <h3>Tonneau n°4</h3>
+                  <span class="status-badge">Libre</span>
+                </div>
+                <div class="barrel-body">
+                  <div class="client-name"></div>
+                  <div class="pay-info"></div>
+                </div>
+                <div class="barrel-actions">
+                  <button class="btn-allocate" onclick="allocateBarrel(4)">
+                    Allouer
+                  </button>
+                </div>
+              </div>
+              <div class="barrel-card free" id="barrel-5">
+                <div class="barrel-header">
+                  <h3>Tonneau n°5</h3>
+                  <span class="status-badge">Libre</span>
+                </div>
+                <div class="barrel-body">
+                  <div class="client-name"></div>
+                  <div class="pay-info"></div>
+                </div>
+                <div class="barrel-actions">
+                  <button class="btn-allocate" onclick="allocateBarrel(5)">
+                    Allouer
+                  </button>
+                </div>
+              </div>
+              <div class="barrel-card free" id="barrel-6">
+                <div class="barrel-header">
+                  <h3>Tonneau n°6</h3>
+                  <span class="status-badge">Libre</span>
+                </div>
+                <div class="barrel-body">
+                  <div class="client-name"></div>
+                  <div class="pay-info"></div>
+                </div>
+                <div class="barrel-actions">
+                  <button class="btn-allocate" onclick="allocateBarrel(6)">
+                    Allouer
+                  </button>
+                </div>
+              </div>
+              <div class="barrel-card free" id="barrel-7">
+                <div class="barrel-header">
+                  <h3>Tonneau n°7</h3>
+                  <span class="status-badge">Libre</span>
+                </div>
+                <div class="barrel-body">
+                  <div class="client-name"></div>
+                  <div class="pay-info"></div>
+                </div>
+                <div class="barrel-actions">
+                  <button class="btn-allocate" onclick="allocateBarrel(7)">
+                    Allouer
+                  </button>
+                </div>
+              </div>
+              <div class="barrel-card free" id="barrel-8">
+                <div class="barrel-header">
+                  <h3>Tonneau n°8</h3>
+                  <span class="status-badge">Libre</span>
+                </div>
+                <div class="barrel-body">
+                  <div class="client-name"></div>
+                  <div class="pay-info"></div>
+                </div>
+                <div class="barrel-actions">
+                  <button class="btn-allocate" onclick="allocateBarrel(8)">
+                    Allouer
+                  </button>
+                </div>
+              </div>
+              <div class="barrel-card free" id="barrel-9">
+                <div class="barrel-header">
+                  <h3>Tonneau n°9</h3>
+                  <span class="status-badge">Libre</span>
+                </div>
+                <div class="barrel-body">
+                  <div class="client-name"></div>
+                  <div class="pay-info"></div>
+                </div>
+                <div class="barrel-actions">
+                  <button class="btn-allocate" onclick="allocateBarrel(9)">
+                    Allouer
+                  </button>
+                </div>
+              </div>
+              <div class="barrel-card free" id="barrel-10">
+                <div class="barrel-header">
+                  <h3>Tonneau n°10</h3>
+                  <span class="status-badge">Libre</span>
+                </div>
+                <div class="barrel-body">
+                  <div class="client-name"></div>
+                  <div class="pay-info"></div>
+                </div>
+                <div class="barrel-actions">
+                  <button class="btn-allocate" onclick="allocateBarrel(10)">
+                    Allouer
+                  </button>
+                </div>
+              </div>
+              <div class="barrel-card free" id="barrel-11">
+                <div class="barrel-header">
+                  <h3>Tonneau n°11</h3>
+                  <span class="status-badge">Libre</span>
+                </div>
+                <div class="barrel-body">
+                  <div class="client-name"></div>
+                  <div class="pay-info"></div>
+                </div>
+                <div class="barrel-actions">
+                  <button class="btn-allocate" onclick="allocateBarrel(11)">
+                    Allouer
+                  </button>
+                </div>
+              </div>
+              <div class="barrel-card free" id="barrel-12">
+                <div class="barrel-header">
+                  <h3>Tonneau n°12</h3>
+                  <span class="status-badge">Libre</span>
+                </div>
+                <div class="barrel-body">
+                  <div class="client-name"></div>
+                  <div class="pay-info"></div>
+                </div>
+                <div class="barrel-actions">
+                  <button class="btn-allocate" onclick="allocateBarrel(12)">
+                    Allouer
+                  </button>
+                </div>
+              </div>
+              <div class="barrel-card free" id="barrel-13">
+                <div class="barrel-header">
+                  <h3>Tonneau n°13</h3>
+                  <span class="status-badge">Libre</span>
+                </div>
+                <div class="barrel-body">
+                  <div class="client-name"></div>
+                  <div class="pay-info"></div>
+                </div>
+                <div class="barrel-actions">
+                  <button class="btn-allocate" onclick="allocateBarrel(13)">
+                    Allouer
+                  </button>
+                </div>
+              </div>
+              <div class="barrel-card free" id="barrel-14">
+                <div class="barrel-header">
+                  <h3>Tonneau n°14</h3>
+                  <span class="status-badge">Libre</span>
+                </div>
+                <div class="barrel-body">
+                  <div class="client-name"></div>
+                  <div class="pay-info"></div>
+                </div>
+                <div class="barrel-actions">
+                  <button class="btn-allocate" onclick="allocateBarrel(14)">
+                    Allouer
+                  </button>
+                </div>
+              </div>
+              <div class="barrel-card free" id="barrel-15">
+                <div class="barrel-header">
+                  <h3>Tonneau n°15</h3>
+                  <span class="status-badge">Libre</span>
+                </div>
+                <div class="barrel-body">
+                  <div class="client-name"></div>
+                  <div class="pay-info"></div>
+                </div>
+                <div class="barrel-actions">
+                  <button class="btn-allocate" onclick="allocateBarrel(15)">
+                    Allouer
+                  </button>
+                </div>
+              </div>
+              <div class="barrel-card free" id="barrel-16">
+                <div class="barrel-header">
+                  <h3>Tonneau n°16</h3>
+                  <span class="status-badge">Libre</span>
+                </div>
+                <div class="barrel-body">
+                  <div class="client-name"></div>
+                  <div class="pay-info"></div>
+                </div>
+                <div class="barrel-actions">
+                  <button class="btn-allocate" onclick="allocateBarrel(16)">
+                    Allouer
+                  </button>
+                </div>
+              </div>
+              <div class="barrel-card free" id="barrel-17">
+                <div class="barrel-header">
+                  <h3>Tonneau n°17</h3>
+                  <span class="status-badge">Libre</span>
+                </div>
+                <div class="barrel-body">
+                  <div class="client-name"></div>
+                  <div class="pay-info"></div>
+                </div>
+                <div class="barrel-actions">
+                  <button class="btn-allocate" onclick="allocateBarrel(17)">
+                    Allouer
+                  </button>
+                </div>
+              </div>
+              <div class="barrel-card free" id="barrel-18">
+                <div class="barrel-header">
+                  <h3>Tonneau n°18</h3>
+                  <span class="status-badge">Libre</span>
+                </div>
+                <div class="barrel-body">
+                  <div class="client-name"></div>
+                  <div class="pay-info"></div>
+                </div>
+                <div class="barrel-actions">
+                  <button class="btn-allocate" onclick="allocateBarrel(18)">
+                    Allouer
+                  </button>
+                </div>
+              </div>
+              <div class="barrel-card free" id="barrel-19">
+                <div class="barrel-header">
+                  <h3>Tonneau n°19</h3>
+                  <span class="status-badge">Libre</span>
+                </div>
+                <div class="barrel-body">
+                  <div class="client-name"></div>
+                  <div class="pay-info"></div>
+                </div>
+                <div class="barrel-actions">
+                  <button class="btn-allocate" onclick="allocateBarrel(19)">
+                    Allouer
+                  </button>
+                </div>
+              </div>
+              <div class="barrel-card free" id="barrel-20">
+                <div class="barrel-header">
+                  <h3>Tonneau n°20</h3>
+                  <span class="status-badge">Libre</span>
+                </div>
+                <div class="barrel-body">
+                  <div class="client-name"></div>
+                  <div class="pay-info"></div>
+                </div>
+                <div class="barrel-actions">
+                  <button class="btn-allocate" onclick="allocateBarrel(20)">
+                    Allouer
+                  </button>
+                </div>
+              </div>
+              <div class="barrel-card free" id="barrel-21">
+                <div class="barrel-header">
+                  <h3>Tonneau n°21</h3>
+                  <span class="status-badge">Libre</span>
+                </div>
+                <div class="barrel-body">
+                  <div class="client-name"></div>
+                  <div class="pay-info"></div>
+                </div>
+                <div class="barrel-actions">
+                  <button class="btn-allocate" onclick="allocateBarrel(21)">
+                    Allouer
+                  </button>
+                </div>
+              </div>
+              <div class="barrel-card free" id="barrel-22">
+                <div class="barrel-header">
+                  <h3>Tonneau n°22</h3>
+                  <span class="status-badge">Libre</span>
+                </div>
+                <div class="barrel-body">
+                  <div class="client-name"></div>
+                  <div class="pay-info"></div>
+                </div>
+                <div class="barrel-actions">
+                  <button class="btn-allocate" onclick="allocateBarrel(22)">
+                    Allouer
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ONGLET LOCATION DE FOUR -->
+          <section id="tab-four" class="tab-content">
+            <div
+              style="
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 20px;
+              "
+            >
+              <div>
+                <h2 class="page-title" style="margin-bottom: 5px; border: none">
+                  Location de Four
+                </h2>
+                <p style="color: var(--text-muted); font-size: 0.9em">
+                  Tarif : <strong>30 Septims / semaine</strong>.
+                </p>
+              </div>
+              <button
+                class="btn-primary"
+                onclick="openFurnaceModal()"
+                style="width: auto"
+              >
+                <i class="fa-solid fa-plus"></i> Nouveau Client
+              </button>
+            </div>
+
+            <div id="furnaces-container" class="barrels-grid">
+              <!-- Les cartes des fours seront générées par JS -->
+            </div>
+          </section>
+
           <!-- ONGLET HISTORIQUE (EMPLOYÉ) -->
           <section id="tab-historique" class="tab-content">
             <h2 class="page-title">Mon Historique</h2>
@@ -301,67 +686,48 @@
 
           <!-- ONGLET GESTION (PATRON) -->
           <section id="tab-gestion" class="tab-content">
-            <h2 class="page-title">Tableau de Bord - Direction</h2>
-
-            <div class="stats-grid">
-              <div class="stat-card bg-green">
-                <h3>Total Ventes</h3>
-                <p id="stat-ventes">0.00 Septims</p>
-              </div>
-              <div class="stat-card bg-red">
-                <h3>Dépenses Globales (Achats + Salaires)</h3>
-                <p id="stat-achats">0.00 Septims</p>
-              </div>
-              <div class="stat-card bg-orange">
-                <h3>Bénéfice Total</h3>
-                <p id="stat-benefice">0.00 Septims</p>
+            <div
+              style="
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 20px;
+              "
+            >
+              <h2 class="page-title" style="margin-bottom: 0; border: none">
+                Tableau de Bord - Direction
+              </h2>
+              <div class="input-group" style="width: 250px">
+                <select
+                  id="period-selector"
+                  onchange="changePeriod(this.value)"
+                  style="
+                    background: var(--bg-card);
+                    border: 1px solid var(--accent);
+                    font-weight: bold;
+                    color: var(--accent);
+                  "
+                >
+                  <option value="all">Depuis toujours</option>
+                  <option value="today">Aujourd'hui</option>
+                  <option value="week">7 derniers jours</option>
+                  <option value="month">Ce mois-ci</option>
+                </select>
               </div>
             </div>
 
-            <!-- BÉNÉFICES PAR PÉRIODE -->
-            <div class="card mb-15">
-              <h3>
-                <i class="fa-solid fa-chart-line"></i> Bénéfices Nets par
-                Période
-              </h3>
-              <div
-                class="stats-grid"
-                style="
-                  grid-template-columns: repeat(4, 1fr);
-                  margin-bottom: 0;
-                  gap: 15px;
-                "
-              >
-                <div
-                  class="stat-card bg-dark text-center"
-                  style="padding: 15px"
-                >
-                  <h3 style="font-size: 0.9em">Aujourd'hui</h3>
-                  <p id="profit-jour" style="font-size: 1.5em">0.00 Septims</p>
-                </div>
-                <div
-                  class="stat-card bg-dark text-center"
-                  style="padding: 15px"
-                >
-                  <h3 style="font-size: 0.9em">7 derniers jours</h3>
-                  <p id="profit-semaine" style="font-size: 1.5em">
-                    0.00 Septims
-                  </p>
-                </div>
-                <div
-                  class="stat-card bg-dark text-center"
-                  style="padding: 15px"
-                >
-                  <h3 style="font-size: 0.9em">Ce mois-ci</h3>
-                  <p id="profit-mois" style="font-size: 1.5em">0.00 Septims</p>
-                </div>
-                <div
-                  class="stat-card bg-dark text-center"
-                  style="padding: 15px"
-                >
-                  <h3 style="font-size: 0.9em">Depuis toujours</h3>
-                  <p id="profit-total" style="font-size: 1.5em">0.00 Septims</p>
-                </div>
+            <div class="stats-grid">
+              <div class="stat-card bg-green">
+                <h3>Ventes (Période)</h3>
+                <p id="stat-ventes">0.00 Septims</p>
+              </div>
+              <div class="stat-card bg-red">
+                <h3>Dépenses (Période)</h3>
+                <p id="stat-achats">0.00 Septims</p>
+              </div>
+              <div class="stat-card bg-orange">
+                <h3>Bénéfice (Période)</h3>
+                <p id="stat-benefice">0.00 Septims</p>
               </div>
             </div>
 
@@ -382,6 +748,16 @@
                   <h3>
                     <i class="fa-solid fa-users-gear"></i> Gestion du Personnel
                   </h3>
+                  <p
+                    style="
+                      font-size: 0.8em;
+                      color: var(--text-muted);
+                      margin-bottom: 10px;
+                    "
+                  >
+                    <i class="fa-solid fa-hand-pointer"></i> Cliquez sur un
+                    employé pour voir son historique.
+                  </p>
                   <div
                     id="admin-personnel-list"
                     style="max-height: 400px; overflow-y: auto"
@@ -416,7 +792,8 @@
               <div class="col-right">
                 <div class="card">
                   <h3>
-                    <i class="fa-solid fa-list"></i> Toutes les transactions
+                    <i class="fa-solid fa-list"></i> Transactions (Période
+                    sélectionnée)
                   </h3>
                   <div class="table-responsive">
                     <table class="data-table">
@@ -441,12 +818,145 @@
       </div>
     </div>
 
-    <!-- POP-UP (MODALE) -->
+    <!-- POP-UP CLASSIQUE -->
     <div id="custom-popup" class="modal-overlay">
       <div class="modal-box">
         <h3 id="popup-title">Titre</h3>
         <p id="popup-message">Message</p>
         <button class="btn-primary" onclick="closePopup()">Compris</button>
+      </div>
+    </div>
+
+    <!-- MODALE POUR ALLOUER UN TONNEAU -->
+    <div id="allocate-barrel-modal" class="modal-overlay">
+      <div class="modal-box">
+        <h3>Allouer un Tonneau</h3>
+        <p
+          id="allocate-barrel-title"
+          style="
+            margin-bottom: 15px;
+            color: var(--accent);
+            font-weight: bold;
+            font-size: 1.2em;
+          "
+        >
+          Tonneau n°1
+        </p>
+        <div class="input-group" style="margin-bottom: 20px">
+          <input
+            type="text"
+            id="allocate-client-name"
+            placeholder="Nom du client (RP)"
+            style="text-align: center; font-size: 1.1em; padding: 15px"
+          />
+        </div>
+        <div style="display: flex; gap: 10px">
+          <button
+            class="btn-secondary"
+            onclick="closeAllocateModal()"
+            style="flex: 1"
+          >
+            Annuler
+          </button>
+          <button
+            class="btn-primary"
+            onclick="confirmAllocateBarrel()"
+            style="flex: 1"
+          >
+            Valider
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODALE POUR CRÉER UN CLIENT FOUR -->
+    <div id="create-furnace-modal" class="modal-overlay">
+      <div class="modal-box">
+        <h3>Nouveau Client (Four)</h3>
+        <p
+          style="
+            margin-bottom: 15px;
+            color: var(--text-muted);
+            font-size: 0.9em;
+          "
+        >
+          Entrez le nom du client. Il apparaîtra dans la liste pour être payé.
+        </p>
+        <div class="input-group" style="margin-bottom: 20px">
+          <input
+            type="text"
+            id="furnace-client-name"
+            placeholder="Nom du client (RP)"
+            style="text-align: center; font-size: 1.1em; padding: 15px"
+          />
+        </div>
+        <div style="display: flex; gap: 10px">
+          <button
+            class="btn-secondary"
+            onclick="closeFurnaceModal()"
+            style="flex: 1"
+          >
+            Annuler
+          </button>
+          <button
+            class="btn-primary"
+            onclick="confirmCreateFurnace()"
+            style="flex: 1"
+          >
+            Valider
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODALE CONFIRMATION -->
+    <div id="confirm-modal" class="modal-overlay">
+      <div class="modal-box">
+        <h3 id="confirm-title">Confirmation</h3>
+        <p id="confirm-message">Êtes-vous sûr ?</p>
+        <div style="display: flex; gap: 10px; margin-top: 20px">
+          <button
+            class="btn-secondary"
+            onclick="closeConfirm(false)"
+            style="flex: 1"
+          >
+            Annuler
+          </button>
+          <button
+            class="btn-primary"
+            onclick="closeConfirm(true)"
+            style="flex: 1; background: var(--danger)"
+          >
+            Confirmer
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODALE HISTORIQUE EMPLOYÉ -->
+    <div id="user-history-modal" class="modal-overlay">
+      <div
+        class="modal-box"
+        style="max-width: 800px; width: 90%; text-align: left"
+      >
+        <h3 id="user-history-title" style="text-align: center">Historique</h3>
+        <div
+          class="table-responsive"
+          style="max-height: 400px; overflow-y: auto; margin-bottom: 20px"
+        >
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Type</th>
+                <th>Objet</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody id="user-history-body"></tbody>
+          </table>
+        </div>
+        <button class="btn-primary" onclick="closeUserHistory()">Fermer</button>
       </div>
     </div>
 
