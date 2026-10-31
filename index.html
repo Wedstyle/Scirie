@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Scierie d'Anga RP - Gestion</title>
+    <link rel="stylesheet" href="style.css" />
+    <!-- Icônes FontAwesome -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <!-- Librairie pour les graphiques -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  </head>
+  <body>
+    <!-- ÉCRANS D'AUTHENTIFICATION -->
+    <div id="auth-screen" class="full-screen">
+      <div class="auth-box">
+        <h1><i class="fa-solid fa-tree"></i> Scierie d'Anga</h1>
+        <p class="subtitle">Système de Gestion RP</p>
+
+        <div id="login-form">
+          <h2>Pointage</h2>
+          <div class="input-group">
+            <i class="fa-solid fa-user"></i>
+            <input
+              type="text"
+              id="login-pseudo"
+              placeholder="Nom et Prénom (RP)"
+            />
+          </div>
+          <div class="input-group">
+            <i class="fa-solid fa-lock"></i>
+            <input
+              type="password"
+              id="login-password"
+              placeholder="Code d'accès"
+            />
+          </div>
+          <button class="btn-primary" onclick="login()">
+            Prendre son poste
+          </button>
+          <p class="toggle-text">
+            Nouveau ?
+            <a href="#" onclick="toggleAuth('register')">Demande d'embauche</a>
+          </p>
+        </div>
+
+        <div id="register-form" style="display: none">
+          <h2>Demande d'Embauche</h2>
+          <div class="input-group">
+            <i class="fa-solid fa-user-plus"></i>
+            <input
+              type="text"
+              id="reg-pseudo"
+              placeholder="Nom et Prénom (RP)"
+            />
+          </div>
+          <div class="input-group">
+            <i class="fa-solid fa-key"></i>
+            <input
+              type="password"
+              id="reg-password"
+              placeholder="Choisissez un Code d'accès"
+            />
+          </div>
+          <button class="btn-primary" onclick="register()">
+            Soumettre au Patron
+          </button>
+          <p class="toggle-text">
+            Déjà employé ?
+            <a href="#" onclick="toggleAuth('login')">Retour au pointage</a>
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ÉCRAN D'ATTENTE -->
+    <div id="pending-screen" class="full-screen" style="display: none">
+      <div class="auth-box text-center">
+        <i class="fa-solid fa-hourglass-half fa-3x text-warning"></i>
+        <h2>Dossier en attente</h2>
+        <p>
+          Votre demande a bien été transmise au Patron.<br />Veuillez patienter
+          qu'il valide votre contrat.
+        </p>
+        <button class="btn-secondary" onclick="logout()">Quitter</button>
+      </div>
+    </div>
+
+    <!-- APPLICATION PRINCIPALE -->
+    <div id="app-screen" style="display: none">
+      <header>
+        <div class="logo"><i class="fa-solid fa-tree"></i> Scierie d'Anga</div>
+        <div class="user-info">
+          <span id="user-display-name">Nom</span>
+          <span id="user-role-badge" class="badge">Rôle</span>
+          <button class="btn-icon" onclick="logout()" title="Quitter">
+            <i class="fa-solid fa-power-off"></i>
+          </button>
+        </div>
+      </header>
+
+      <div class="layout">
+        <!-- MENU LATÉRAL -->
+        <aside class="sidebar">
+          <nav>
+            <button
+              class="nav-btn active"
+              onclick="switchTab('tab-commandes', this)"
+            >
+              <i class="fa-solid fa-file-signature"></i> Bons de Commande
+            </button>
+            <button class="nav-btn" onclick="switchTab('tab-stock', this)">
+              <i class="fa-solid fa-boxes-stacked"></i> État du Stock
+            </button>
+            <button class="nav-btn" onclick="switchTab('tab-saisie', this)">
+              <i class="fa-solid fa-clipboard-list"></i> Saisie Directe
+            </button>
+            <button
+              class="nav-btn"
+              id="nav-historique"
+              onclick="switchTab('tab-historique', this)"
+            >
+              <i class="fa-solid fa-clock-rotate-left"></i> Mon Historique
+            </button>
+            <button
+              class="nav-btn"
+              id="nav-gestion"
+              onclick="switchTab('tab-gestion', this)"
+            >
+              <i class="fa-solid fa-chart-pie"></i> Tableau de Bord
+            </button>
+          </nav>
+        </aside>
+
+        <!-- CONTENU PRINCIPAL -->
+        <main class="content">
+          <!-- ONGLET COMMANDES -->
+          <section id="tab-commandes" class="tab-content active">
+            <h2 class="page-title">Bons de Commande</h2>
+            <div class="grid-layout">
+              <div class="card">
+                <h3><i class="fa-solid fa-plus"></i> Nouvelle Commande</h3>
+                <form id="order-form" onsubmit="createOrder(event)">
+                  <div class="input-group mb-15">
+                    <label>Nom du Client</label>
+                    <input
+                      type="text"
+                      id="ord-client"
+                      required
+                      placeholder="Ex: Jarl Balgruuf"
+                    />
+                  </div>
+                  <div class="form-row">
+                    <div class="input-group">
+                      <label>Objet</label>
+                      <select id="ord-item">
+                        <option value="Petit bois">Petit bois</option>
+                        <option value="Charbon Pauvre">Charbon Pauvre</option>
+                        <option value="Charbon Normale">Charbon Normale</option>
+                        <option value="Briquettes de Charbon">
+                          Briquettes de Charbon
+                        </option>
+                        <option value="Coke de charbon">Coke de charbon</option>
+                      </select>
+                    </div>
+                    <div class="input-group">
+                      <label>Quantité</label>
+                      <input
+                        type="number"
+                        id="ord-qty"
+                        value="10"
+                        min="1"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div class="form-row mb-15">
+                    <div class="input-group">
+                      <label>Prix U. (Septims)</label>
+                      <input
+                        type="number"
+                        id="ord-price"
+                        step="0.01"
+                        value="1.00"
+                        required
+                      />
+                    </div>
+                    <div class="input-group">
+                      <label>Date limite (Optionnel)</label>
+                      <input type="date" id="ord-deadline" />
+                    </div>
+                  </div>
+                  <button type="submit" class="btn-primary">
+                    Créer la commande
+                  </button>
+                </form>
+              </div>
+
+              <div class="card">
+                <h3>Commandes en attente</h3>
+                <div id="orders-container" class="orders-grid"></div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ONGLET STOCK -->
+          <section id="tab-stock" class="tab-content">
+            <h2 class="page-title">État du Stock</h2>
+            <div class="card">
+              <div class="stock-grid" id="stock-container"></div>
+            </div>
+          </section>
+
+          <!-- ONGLET SAISIE DIRECTE -->
+          <section id="tab-saisie" class="tab-content">
+            <h2 class="page-title">Enregistrer une opération directe</h2>
+            <div class="card" style="max-width: 800px">
+              <form id="employe-form" onsubmit="addTransaction(event)">
+                <div class="form-row">
+                  <div class="input-group">
+                    <label>Type d'opération</label>
+                    <select id="emp-type" onchange="updateBasePrice()">
+                      <option value="vente">Vente (Entrée de Septims)</option>
+                      <option value="achat">Achat (Sortie de Septims)</option>
+                    </select>
+                  </div>
+                  <div class="input-group">
+                    <label>Type d'objet</label>
+                    <select id="emp-item" onchange="updateBasePrice()">
+                      <option value="Petit bois">Petit bois</option>
+                      <option value="Charbon Pauvre">Charbon Pauvre</option>
+                      <option value="Charbon Normale">Charbon Normale</option>
+                      <option value="Briquettes de Charbon">
+                        Briquettes de Charbon
+                      </option>
+                      <option value="Coke de charbon">Coke de charbon</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="form-row">
+                  <div class="input-group">
+                    <label>Quantité</label>
+                    <input
+                      type="number"
+                      id="emp-quantity"
+                      value="1"
+                      min="1"
+                      required
+                    />
+                  </div>
+                  <div class="input-group">
+                    <label>Prix Unitaire (Septims)</label>
+                    <input
+                      type="number"
+                      id="emp-price"
+                      step="0.01"
+                      value="0.20"
+                      required
+                    />
+                  </div>
+                  <div class="input-group">
+                    <label>Coût Total</label>
+                    <input
+                      type="text"
+                      id="emp-total"
+                      value="0.20 Septims"
+                      disabled
+                      class="highlight-input"
+                    />
+                  </div>
+                </div>
+                <button type="submit" class="btn-primary mt-15">
+                  <i class="fa-solid fa-plus"></i> Enregistrer l'opération
+                </button>
+              </form>
+            </div>
+          </section>
+
+          <!-- ONGLET HISTORIQUE (EMPLOYÉ) -->
+          <section id="tab-historique" class="tab-content">
+            <h2 class="page-title">Mon Historique</h2>
+            <div class="card">
+              <div class="table-responsive">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Type</th>
+                      <th>Objet</th>
+                      <th>Total</th>
+                    </tr>
+                  </thead>
+                  <tbody id="emp-history-body"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <!-- ONGLET GESTION (PATRON) -->
+          <section id="tab-gestion" class="tab-content">
+            <h2 class="page-title">Tableau de Bord - Direction</h2>
+
+            <div class="stats-grid">
+              <div class="stat-card bg-green">
+                <h3>Total Ventes</h3>
+                <p id="stat-ventes">0.00 Septims</p>
+              </div>
+              <div class="stat-card bg-red">
+                <h3>Dépenses (Achats + Salaires)</h3>
+                <p id="stat-achats">0.00 Septims</p>
+              </div>
+              <div class="stat-card bg-orange">
+                <h3>Bénéfice Net</h3>
+                <p id="stat-benefice">0.00 Septims</p>
+              </div>
+            </div>
+
+            <div class="charts-grid">
+              <div class="card chart-card">
+                <h3>Répartition des Achats</h3>
+                <canvas id="chart-achats"></canvas>
+              </div>
+              <div class="card chart-card">
+                <h3>Répartition des Ventes</h3>
+                <canvas id="chart-ventes"></canvas>
+              </div>
+            </div>
+
+            <div class="grid-layout">
+              <div class="col-left">
+                <div class="card">
+                  <h3>
+                    <i class="fa-solid fa-user-check"></i> Demandes d'embauche
+                  </h3>
+                  <div id="admin-pending-list"></div>
+                </div>
+
+                <div class="card">
+                  <h3>
+                    <i class="fa-solid fa-money-bill-wave"></i> Contrats de
+                    Salaires
+                  </h3>
+                  <div id="admin-salaries-list"></div>
+                  <div style="display: flex; gap: 10px; margin-top: 15px">
+                    <button
+                      class="btn-secondary"
+                      onclick="saveSalaries()"
+                      style="flex: 1"
+                    >
+                      <i class="fa-solid fa-floppy-disk"></i> Sauvegarder
+                    </button>
+                    <button
+                      class="btn-primary"
+                      onclick="paySalaries()"
+                      style="flex: 1; background: #8e44ad; color: white"
+                    >
+                      <i class="fa-solid fa-hand-holding-dollar"></i> Payer
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-right">
+                <div class="card">
+                  <h3>
+                    <i class="fa-solid fa-list"></i> Toutes les transactions
+                  </h3>
+                  <div class="table-responsive">
+                    <table class="data-table">
+                      <thead>
+                        <tr>
+                          <th>Date</th>
+                          <th>Par</th>
+                          <th>Type</th>
+                          <th>Objet</th>
+                          <th>Total</th>
+                          <th>Action</th>
+                        </tr>
+                      </thead>
+                      <tbody id="admin-history-body"></tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <!-- POP-UP (MODALE) -->
+    <div id="custom-popup" class="modal-overlay">
+      <div class="modal-box">
+        <h3 id="popup-title">Titre</h3>
+        <p id="popup-message">Message</p>
+        <button class="btn-primary" onclick="closePopup()">Compris</button>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
