@@ -603,7 +603,6 @@ async function loadPatronData() {
     filtered.forEach((t) => {
       const cost = t.quantity * t.unit_price;
 
-      // On ignore les ajustements pour le calcul des bénéfices
       if (t.type === "achat") totalAchats += cost;
       else if (t.type === "salaire") totalSalairesPayes += cost;
       else if (t.type === "vente") totalVentes += cost;
@@ -663,15 +662,141 @@ async function loadPatronData() {
   }
 }
 
-function updateSalaryTotal() {
-  let total = 0;
-  document.querySelectorAll('[id^="sal-amount-"]').forEach((input) => {
-    total += parseFloat(input.value) || 0;
+// ==========================================
+// --- GRAPHIQUES (CORRIGÉS) ---
+// ==========================================
+function renderCharts(transactions) {
+  let achats = {
+    "Petit bois": 0,
+    "Charbon Pauvre": 0,
+    "Charbon Normale": 0,
+    "Briquettes de Charbon": 0,
+    "Coke de charbon": 0,
+  };
+  let ventes = {
+    "Petit bois": 0,
+    "Charbon Pauvre": 0,
+    "Charbon Normale": 0,
+    "Briquettes de Charbon": 0,
+    "Coke de charbon": 0,
+    "Location tonneau": 0,
+    "Location four": 0,
+  };
+
+  transactions.forEach((t) => {
+    const cost = t.quantity * t.unit_price;
+    if (t.type === "achat" && achats[t.item_type] !== undefined)
+      achats[t.item_type] += cost;
+    if (t.type === "vente" && ventes[t.item_type] !== undefined)
+      ventes[t.item_type] += cost;
   });
-  const display = document.getElementById("salary-total-display");
-  if (display) display.innerText = Math.floor(total) + " S";
+
+  const labelsAchats = Object.keys(achats).filter((k) => achats[k] > 0);
+  const dataAchats = labelsAchats.map((k) => achats[k]);
+
+  const labelsVentes = Object.keys(ventes).filter((k) => ventes[k] > 0);
+  const dataVentes = labelsVentes.map((k) => ventes[k]);
+
+  if (chartAchatsInstance) chartAchatsInstance.destroy();
+  if (chartVentesInstance) chartVentesInstance.destroy();
+
+  // Options communes : Légende en bas pour centrer le cercle
+  const commonOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    layout: { padding: 0 },
+    plugins: {
+      legend: {
+        position: "bottom",
+        labels: {
+          color: "#94A3B8",
+          font: { family: "Inter", size: 12 },
+          padding: 15,
+          usePointStyle: true,
+          pointStyle: "circle",
+        },
+      },
+    },
+  };
+
+  // --- GRAPHIQUE ACHATS ---
+  const ctxA = document.getElementById("chart-achats").getContext("2d");
+
+  if (labelsAchats.length === 0) {
+    chartAchatsInstance = new Chart(ctxA, {
+      type: "doughnut",
+      data: {
+        labels: ["Vide"],
+        datasets: [{ data: [1], backgroundColor: ["#2A2A35"], borderWidth: 0 }],
+      },
+      options: {
+        ...commonOptions,
+        plugins: {
+          ...commonOptions.plugins,
+          legend: { display: false },
+          tooltip: { enabled: false },
+        },
+      },
+    });
+  } else {
+    chartAchatsInstance = new Chart(ctxA, {
+      type: "doughnut",
+      data: {
+        labels: labelsAchats,
+        datasets: [
+          {
+            data: dataAchats,
+            backgroundColor: labelsAchats.map((l) => typeColors[l] || "#888"),
+            borderWidth: 0, // <-- SUPPRIME LA LIGNE BLANCHE
+            cutout: "60%",
+          },
+        ],
+      },
+      options: commonOptions,
+    });
+  }
+
+  // --- GRAPHIQUE VENTES ---
+  const ctxV = document.getElementById("chart-ventes").getContext("2d");
+
+  if (labelsVentes.length === 0) {
+    chartVentesInstance = new Chart(ctxV, {
+      type: "doughnut",
+      data: {
+        labels: ["Vide"],
+        datasets: [{ data: [1], backgroundColor: ["#2A2A35"], borderWidth: 0 }],
+      },
+      options: {
+        ...commonOptions,
+        plugins: {
+          ...commonOptions.plugins,
+          legend: { display: false },
+          tooltip: { enabled: false },
+        },
+      },
+    });
+  } else {
+    chartVentesInstance = new Chart(ctxV, {
+      type: "doughnut",
+      data: {
+        labels: labelsVentes,
+        datasets: [
+          {
+            data: dataVentes,
+            backgroundColor: labelsVentes.map((l) => typeColors[l] || "#888"),
+            borderWidth: 0, // <-- SUPPRIME LA LIGNE BLANCHE
+            cutout: "60%",
+          },
+        ],
+      },
+      options: commonOptions,
+    });
+  }
 }
 
+// ==========================================
+// --- HISTORIQUE INDIVIDUEL ---
+// ==========================================
 async function showUserHistory(userId, userName) {
   document.getElementById("user-history-title").innerText =
     `Historique de ${userName}`;
@@ -716,79 +841,18 @@ function closeUserHistory() {
   document.getElementById("user-history-modal").style.display = "none";
 }
 
-function renderCharts(transactions) {
-  let achats = {
-    "Petit bois": 0,
-    "Charbon Pauvre": 0,
-    "Charbon Normale": 0,
-    "Briquettes de Charbon": 0,
-    "Coke de charbon": 0,
-  };
-  let ventes = {
-    "Petit bois": 0,
-    "Charbon Pauvre": 0,
-    "Charbon Normale": 0,
-    "Briquettes de Charbon": 0,
-    "Coke de charbon": 0,
-    "Location tonneau": 0,
-    "Location four": 0,
-    Ajustement: 0,
-  };
-
-  transactions.forEach((t) => {
-    const cost = t.quantity * t.unit_price;
-    if (t.type === "achat" && achats[t.item_type] !== undefined)
-      achats[t.item_type] += cost;
-    if (t.type === "vente" && ventes[t.item_type] !== undefined)
-      ventes[t.item_type] += cost;
+function updateSalaryTotal() {
+  let total = 0;
+  document.querySelectorAll('[id^="sal-amount-"]').forEach((input) => {
+    total += parseFloat(input.value) || 0;
   });
-
-  if (chartAchatsInstance) chartAchatsInstance.destroy();
-  if (chartVentesInstance) chartVentesInstance.destroy();
-
-  const ctxA = document.getElementById("chart-achats").getContext("2d");
-  chartAchatsInstance = new Chart(ctxA, {
-    type: "doughnut",
-    data: {
-      labels: Object.keys(achats).filter((k) => achats[k] > 0),
-      datasets: [
-        {
-          data: Object.values(achats).filter((v) => v > 0),
-          backgroundColor: Object.keys(achats)
-            .filter((k) => achats[k] > 0)
-            .map((l) => typeColors[l] || "#888"),
-        },
-      ],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { position: "right", labels: { color: "#f0f0f0" } } },
-    },
-  });
-
-  const ctxV = document.getElementById("chart-ventes").getContext("2d");
-  chartVentesInstance = new Chart(ctxV, {
-    type: "doughnut",
-    data: {
-      labels: Object.keys(ventes).filter((k) => ventes[k] > 0),
-      datasets: [
-        {
-          data: Object.values(ventes).filter((v) => v > 0),
-          backgroundColor: Object.keys(ventes)
-            .filter((k) => ventes[k] > 0)
-            .map((l) => typeColors[l] || "#888"),
-        },
-      ],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { position: "right", labels: { color: "#f0f0f0" } } },
-    },
-  });
+  const display = document.getElementById("salary-total-display");
+  if (display) display.innerText = Math.floor(total) + " S";
 }
 
+// ==========================================
+// --- ACTIONS PATRON ---
+// ==========================================
 async function validerUtilisateur(id) {
   const { error } = await db
     .from("profiles")
@@ -911,6 +975,9 @@ async function paySalaries() {
   );
 }
 
+// ==========================================
+// --- TONNEAUX, FOURS, COMMANDES, STOCK (LOGIQUE) ---
+// ==========================================
 async function loadBarrels() {
   const { data: rentals } = await db.from("barrel_rentals").select("*");
   const container = document.querySelector("#tab-location .barrels-grid");
