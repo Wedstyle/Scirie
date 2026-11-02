@@ -12,18 +12,18 @@ let currentPeriod = "all";
 let currentBarrelToAllocate = null;
 
 const basePricesVente = {
-  "Petit bois": 0.2,
-  "Charbon Pauvre": 0.5,
-  "Charbon Normale": 1.0,
-  "Briquettes de Charbon": 4.0,
-  "Coke de charbon": 6.0,
+  "Petit bois": 1,
+  "Charbon Pauvre": 1,
+  "Charbon Normale": 1,
+  "Briquettes de Charbon": 4,
+  "Coke de charbon": 6,
 };
 const basePricesAchat = {
-  "Petit bois": 0.0,
-  "Charbon Pauvre": 0.3,
-  "Charbon Normale": 0.8,
-  "Briquettes de Charbon": 3.0,
-  "Coke de charbon": 5.0,
+  "Petit bois": 1,
+  "Charbon Pauvre": 1,
+  "Charbon Normale": 1,
+  "Briquettes de Charbon": 3,
+  "Coke de charbon": 5,
 };
 const typeColors = {
   "Petit bois": "#8B4513",
@@ -34,6 +34,7 @@ const typeColors = {
   Salaire: "#8e44ad",
   "Location tonneau": "#d4af37",
   "Location four": "#e67e22",
+  Ajustement: "#3b82f6",
 };
 
 // ==========================================
@@ -191,6 +192,10 @@ async function checkUserStatus() {
     document.getElementById("nav-location").style.display = "flex";
     document.getElementById("nav-four").style.display = "flex";
     document.getElementById("nav-historique").style.display = "none";
+
+    const treasuryCard = document.getElementById("treasury-card");
+    if (treasuryCard) treasuryCard.style.display = "block";
+
     switchTab("tab-gestion", document.getElementById("nav-gestion"));
     loadPatronData();
     loadBarrels();
@@ -202,11 +207,14 @@ async function checkUserStatus() {
       document.getElementById("pending-screen").style.display = "flex";
       return;
     }
-    // Le contremaître voit tout SAUF la gestion
     document.getElementById("nav-gestion").style.display = "none";
     document.getElementById("nav-location").style.display = "flex";
     document.getElementById("nav-four").style.display = "flex";
     document.getElementById("nav-historique").style.display = "flex";
+
+    const treasuryCard = document.getElementById("treasury-card");
+    if (treasuryCard) treasuryCard.style.display = "none";
+
     switchTab("tab-commandes", document.querySelector(".nav-btn"));
     loadBarrels();
     loadFurnaces();
@@ -217,31 +225,699 @@ async function checkUserStatus() {
       document.getElementById("pending-screen").style.display = "flex";
       return;
     }
-    // L'employé classique
     document.getElementById("nav-gestion").style.display = "none";
     document.getElementById("nav-location").style.display = "none";
     document.getElementById("nav-four").style.display = "flex";
     document.getElementById("nav-historique").style.display = "flex";
+
+    const treasuryCard = document.getElementById("treasury-card");
+    if (treasuryCard) treasuryCard.style.display = "none";
+
     switchTab("tab-commandes", document.querySelector(".nav-btn"));
     loadFurnaces();
     loadEmployeData();
   }
 
   loadStock();
+  loadTreasury();
   loadOrders();
   updateBasePrice();
 }
 
 // ==========================================
-// --- GESTION DES TONNEAUX (23 TONNEAUX) ---
+// --- TRÉSORERIE (PATRON) ---
 // ==========================================
+async function loadTreasury() {
+  if (userProfile.role !== "patron") return;
+
+  const { data: transactions } = await db.from("transactions").select("*");
+  if (!transactions) return;
+
+  let totalAchats = 0,
+    totalVentes = 0,
+    totalSalaires = 0,
+    totalAjustements = 0;
+
+  transactions.forEach((t) => {
+    const cost = t.quantity * t.unit_price;
+    if (t.type === "achat") totalAchats += cost;
+    else if (t.type === "salaire") totalSalaires += cost;
+    else if (t.type === "vente") totalVentes += cost;
+    else if (t.type === "ajustement") totalAjustements += cost;
+  });
+
+  const treasury = totalVentes - totalAchats - totalSalaires + totalAjustements;
+
+  const el = document.getElementById("current-treasury");
+  if (el) el.value = Math.floor(treasury);
+}
+
+async function updateTreasuryDirect(input) {
+  const newValue = parseInt(input.value);
+
+  if (isNaN(newValue) || newValue < 0) {
+    loadTreasury();
+    return;
+  }
+
+  const { data: transactions } = await db.from("transactions").select("*");
+  let totalAchats = 0,
+    totalVentes = 0,
+    totalSalaires = 0,
+    totalAjustements = 0;
+
+  transactions.forEach((t) => {
+    const cost = t.quantity * t.unit_price;
+    if (t.type === "achat") totalAchats += cost;
+    else if (t.type === "salaire") totalSalaires += cost;
+    else if (t.type === "vente") totalVentes += cost;
+    else if (t.type === "ajustement") totalAjustements += cost;
+  });
+
+  const currentTreasury = Math.floor(
+    totalVentes - totalAchats - totalSalaires + totalAjustements,
+  );
+  const difference = newValue - currentTreasury;
+
+  if (difference === 0) return;
+
+  showConfirm(
+    "Modification directe",
+    `Voulez-vous ajuster la trésorerie de ${difference > 0 ? "+" : ""}${difference} Septims ?`,
+    async () => {
+      const { error } = await db.from("transactions").insert({
+        type: "ajustement",
+        item_type: "Ajustement",
+        counterparty_name: "Modification directe (Patron)",
+        quantity: 1,
+        unit_price: difference,
+        created_by: currentUser.id,
+      });
+
+      if (error) {
+        showPopup("Erreur", error.message);
+        loadTreasury();
+      } else {
+        loadTreasury();
+        loadPatronData();
+      }
+    },
+  );
+}
+
+async function adjustTreasury(type) {
+  const amountInput = document.getElementById("manual-amount");
+  const amount = parseInt(amountInput.value);
+
+  if (!amount || amount <= 0)
+    return showPopup("Erreur", "Veuillez entrer un montant supérieur à 0.");
+
+  const amountValue = type === 1 ? amount : -amount;
+  const action = type === 1 ? "Ajouter" : "Retirer";
+
+  showConfirm(
+    `Ajustement de trésorerie`,
+    `Voulez-vous ${action.toLowerCase()} ${amount} Septims ?`,
+    async () => {
+      const { error } = await db.from("transactions").insert({
+        type: "ajustement",
+        item_type: "Ajustement",
+        counterparty_name: `Manuel (Patron - ${action})`,
+        quantity: 1,
+        unit_price: amountValue,
+        created_by: currentUser.id,
+      });
+
+      if (error) {
+        showPopup("Erreur", error.message);
+      } else {
+        showPopup(
+          "Succès",
+          `${amount} Septims ont été ${action.toLowerCase()}s.`,
+        );
+        amountInput.value = "";
+        loadTreasury();
+        loadPatronData();
+      }
+    },
+  );
+}
+
+// ==========================================
+// --- GESTION DU STOCK ---
+// ==========================================
+async function loadStock() {
+  const { data: stocks, error } = await db
+    .from("stocks")
+    .select("*")
+    .order("id");
+  const container = document.getElementById("stock-container");
+  if (!container) return;
+
+  container.innerHTML = "";
+
+  if (error) {
+    container.innerHTML = `<p class="text-danger">Erreur de chargement.</p>`;
+    return;
+  }
+
+  if (stocks && stocks.length > 0) {
+    stocks.forEach((s) => {
+      const color = typeColors[s.item_name] || "#888";
+      const textColor = s.item_name === "Charbon Normale" ? "#333" : "#fff";
+
+      const controlsHtml =
+        userProfile.role === "patron"
+          ? `
+                <div class="stock-controls">
+                    <input type="number" id="stock-qty-${s.id}" placeholder="Quantité" min="1">
+                    <div class="stock-buttons">
+                        <button class="btn-add" onclick="adjustStock(${s.id}, ${s.quantity}, 1)"><i class="fa-solid fa-plus"></i> Ajouter</button>
+                        <button class="btn-sub" onclick="adjustStock(${s.id}, ${s.quantity}, -1)"><i class="fa-solid fa-minus"></i> Retirer</button>
+                    </div>
+                </div>
+            `
+          : "";
+
+      container.innerHTML += `
+                <div class="stock-item" style="border-left-color: ${color};">
+                    <h4 style="background-color: ${color}; color: ${textColor};">${s.item_name}</h4>
+                    <div class="qty">${s.quantity}</div>
+                    ${controlsHtml}
+                </div>
+            `;
+    });
+  } else {
+    container.innerHTML = `<div class="empty-state"><i class="fa-solid fa-boxes-stacked"></i><p>Le stock est vide.</p></div>`;
+  }
+}
+
+async function adjustStock(id, currentQty, operation) {
+  const input = document.getElementById(`stock-qty-${id}`);
+  const amount = parseInt(input.value);
+
+  if (!amount || amount <= 0)
+    return showPopup("Erreur", "Veuillez entrer une quantité valide.");
+
+  let newQty = operation === 1 ? currentQty + amount : currentQty - amount;
+  if (newQty < 0) newQty = 0;
+
+  const { error } = await db
+    .from("stocks")
+    .update({ quantity: newQty })
+    .eq("id", id);
+
+  if (error) {
+    showPopup("Erreur", "Impossible de modifier le stock.");
+  } else {
+    input.value = "";
+    loadStock();
+  }
+}
+
+// ==========================================
+// --- SAISIE DIRECTE ---
+// ==========================================
+function updateBasePrice() {
+  const type = document.getElementById("emp-type").value;
+  const select = document.getElementById("emp-item");
+  const item = select.value;
+  let price =
+    type === "vente" ? basePricesVente[item] || 0 : basePricesAchat[item] || 0;
+
+  document.getElementById("emp-price").value = Math.floor(price);
+
+  select.style.backgroundColor = typeColors[item] || "#333";
+  select.style.color = item === "Charbon Normale" ? "#333" : "#fff";
+  calcEmpTotal();
+}
+
+document.getElementById("emp-quantity").addEventListener("input", calcEmpTotal);
+document.getElementById("emp-price").addEventListener("input", calcEmpTotal);
+function calcEmpTotal() {
+  const q = parseFloat(document.getElementById("emp-quantity").value) || 0;
+  const p = parseFloat(document.getElementById("emp-price").value) || 0;
+  document.getElementById("emp-total").value = Math.floor(q * p) + " Septims";
+}
+
+async function addTransaction(e) {
+  e.preventDefault();
+  const type = document.getElementById("emp-type").value;
+  const item_type = document.getElementById("emp-item").value;
+  const quantity = parseFloat(document.getElementById("emp-quantity").value);
+  const unit_price = Math.floor(
+    parseFloat(document.getElementById("emp-price").value),
+  );
+
+  if (type === "vente") {
+    const { data: stock } = await db
+      .from("stocks")
+      .select("quantity")
+      .eq("item_name", item_type)
+      .single();
+    if (stock && stock.quantity < quantity)
+      return showPopup(
+        "Stock Insuffisant",
+        `Il ne reste que ${stock.quantity} ${item_type}.`,
+      );
+  }
+
+  const { error } = await db
+    .from("transactions")
+    .insert({
+      type,
+      item_type,
+      counterparty_name: userProfile.full_name,
+      quantity,
+      unit_price,
+      created_by: currentUser.id,
+    });
+
+  if (error) showPopup("Erreur", error.message);
+  else {
+    showPopup("Succès", "Opération enregistrée !");
+    loadEmployeData();
+    loadStock();
+    if (userProfile.role === "patron") {
+      loadPatronData();
+      loadTreasury();
+    }
+  }
+}
+
+// ==========================================
+// --- VUE GESTION (PATRON) ---
+// ==========================================
+async function loadPatronData() {
+  const { data: personnel, error } = await db
+    .from("profiles")
+    .select("*")
+    .order("created_at", { ascending: true });
+  const personnelDiv = document.getElementById("admin-personnel-list");
+  const salDiv = document.getElementById("admin-salaries-list");
+
+  personnelDiv.innerHTML = "";
+  salDiv.innerHTML = "";
+
+  if (error) {
+    personnelDiv.innerHTML = `<p class="text-danger">Erreur : ${error.message}</p>`;
+  } else if (!personnel || personnel.length === 0) {
+    personnelDiv.innerHTML = `<div class="empty-state"><i class="fa-solid fa-users-slash"></i><p>Aucun employé enregistré.</p></div>`;
+    salDiv.innerHTML = `<div class="empty-state"><p>Aucun contrat.</p></div>`;
+  } else {
+    personnel.forEach((p) => {
+      const isMe = p.id === currentUser.id;
+      let actionHtml = "";
+
+      if (p.is_approved) {
+        actionHtml = `<button class="btn-action btn-fire" onclick="event.stopPropagation(); virerUtilisateur('${p.id}', '${p.full_name}')" ${isMe ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : ""}><i class="fa-solid fa-trash"></i></button>`;
+      } else {
+        actionHtml = `<button class="btn-action btn-validate" onclick="event.stopPropagation(); validerUtilisateur('${p.id}')"><i class="fa-solid fa-check"></i></button>
+                              <button class="btn-action btn-fire" onclick="event.stopPropagation(); virerUtilisateur('${p.id}', '${p.full_name}')"><i class="fa-solid fa-trash"></i></button>`;
+      }
+
+      if (p.is_approved && p.role === "employe" && !isMe) {
+        actionHtml =
+          `<button class="btn-action btn-contremaitre" onclick="event.stopPropagation(); changerRole('${p.id}', 'contremaitre')" title="Nommer Contremaître"><i class="fa-solid fa-hard-hat"></i></button>` +
+          actionHtml;
+      }
+      if (p.is_approved && p.role === "contremaitre" && !isMe) {
+        actionHtml =
+          `<button class="btn-action btn-secondary" onclick="event.stopPropagation(); changerRole('${p.id}', 'employe')" title="Rétrograder Employé"><i class="fa-solid fa-arrow-down"></i></button>` +
+          actionHtml;
+      }
+      if (p.role === "employe" && p.is_approved && !isMe) {
+        actionHtml =
+          `<button class="btn-action btn-promote" onclick="event.stopPropagation(); changerRole('${p.id}', 'patron')" title="Promouvoir Patron"><i class="fa-solid fa-crown"></i></button>` +
+          actionHtml;
+      }
+
+      let roleBadge = "Employé";
+      let badgeColor = "var(--text-muted)";
+      if (p.role === "patron") {
+        roleBadge = "Patron";
+        badgeColor = "var(--primary)";
+      }
+      if (p.role === "contremaitre") {
+        roleBadge = "Contremaître";
+        badgeColor = "#3498db";
+      }
+
+      const statusBadge = p.is_approved
+        ? ""
+        : '<span style="color:var(--danger); font-weight:bold;">(En attente)</span>';
+
+      personnelDiv.innerHTML += `
+                <div class="personnel-row" style="cursor: pointer;" onclick="showUserHistory('${p.id}', '${p.full_name}')">
+                    <div class="personnel-info"><strong>${p.full_name} ${isMe ? "(Vous)" : ""}</strong><span>Rôle : <span style="color:${badgeColor}; font-weight:bold;">${roleBadge}</span> ${statusBadge}</span></div>
+                    <div class="personnel-actions">${actionHtml}</div>
+                </div>`;
+
+      if (p.is_approved) {
+        salDiv.innerHTML += `
+                    <div class="salary-row">
+                        <span>${p.full_name}</span>
+                        <input type="number" value="${p.salary || 0}" id="sal-amount-${p.id}" oninput="updateSalaryTotal()" placeholder="0" step="1">
+                    </div>`;
+      }
+    });
+    if (salDiv.innerHTML === "")
+      salDiv.innerHTML = `<div class="empty-state"><p>Aucun employé validé.</p></div>`;
+  }
+
+  updateSalaryTotal();
+
+  const { data: allTransactions } = await db
+    .from("transactions")
+    .select("*")
+    .order("created_at", { ascending: false });
+  const filtered = getFilteredTransactions(allTransactions);
+  const tbody = document.getElementById("admin-history-body");
+
+  if (filtered && filtered.length > 0) {
+    tbody.innerHTML = "";
+    let totalAchats = 0,
+      totalVentes = 0,
+      totalSalairesPayes = 0;
+
+    filtered.forEach((t) => {
+      const cost = t.quantity * t.unit_price;
+
+      // On ignore les ajustements pour le calcul des bénéfices
+      if (t.type === "achat") totalAchats += cost;
+      else if (t.type === "salaire") totalSalairesPayes += cost;
+      else if (t.type === "vente") totalVentes += cost;
+
+      const color = typeColors[t.item_type] || "#888";
+      const textColor = t.item_type === "Charbon Normale" ? "#333" : "#fff";
+
+      let badgeClass = "bg-secondary";
+      let textClass = "text-muted";
+
+      if (t.type === "vente") {
+        badgeClass = "bg-green";
+        textClass = "text-success";
+      }
+      if (t.type === "achat") {
+        badgeClass = "bg-red";
+        textClass = "text-danger";
+      }
+      if (t.type === "salaire") {
+        badgeClass = "bg-purple";
+        textClass = "text-danger";
+      }
+      if (t.type === "ajustement") {
+        badgeClass = "bg-blue";
+        textClass = cost >= 0 ? "text-success" : "text-danger";
+      }
+
+      tbody.innerHTML += `
+                <tr>
+                    <td>${new Date(t.created_at).toLocaleDateString()}</td>
+                    <td>${t.counterparty_name}</td>
+                    <td><span class="badge-type ${badgeClass}" style="${t.type === "ajustement" ? "background-color: #3b82f6; color: white;" : ""}">${t.type.toUpperCase()}</span></td>
+                    <td><span class="badge-type" style="background-color: ${color}; color: ${textColor};">${t.item_type}</span></td>
+                    <td class="${textClass}">${Math.floor(cost)} S</td>
+                    <td><button class="btn-icon text-danger" onclick="deleteTransaction(${t.id})"><i class="fa-solid fa-trash"></i></button></td>
+                </tr>`;
+    });
+
+    const totalDepenses = totalAchats + totalSalairesPayes;
+    document.getElementById("stat-ventes").innerText =
+      Math.floor(totalVentes) + " S";
+    document.getElementById("stat-achats").innerText =
+      Math.floor(totalDepenses) + " S";
+
+    const benefice = totalVentes - totalDepenses;
+    const elBenefice = document.getElementById("stat-benefice");
+    elBenefice.innerText = Math.floor(benefice) + " S";
+    elBenefice.className = benefice >= 0 ? "text-success" : "text-danger";
+
+    renderCharts(filtered);
+  } else {
+    tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><i class="fa-solid fa-list"></i><p>Aucune transaction.</p></div></td></tr>`;
+    document.getElementById("stat-ventes").innerText = "0 S";
+    document.getElementById("stat-achats").innerText = "0 S";
+    document.getElementById("stat-benefice").innerText = "0 S";
+    renderCharts([]);
+  }
+}
+
+function updateSalaryTotal() {
+  let total = 0;
+  document.querySelectorAll('[id^="sal-amount-"]').forEach((input) => {
+    total += parseFloat(input.value) || 0;
+  });
+  const display = document.getElementById("salary-total-display");
+  if (display) display.innerText = Math.floor(total) + " S";
+}
+
+async function showUserHistory(userId, userName) {
+  document.getElementById("user-history-title").innerText =
+    `Historique de ${userName}`;
+  document.getElementById("user-history-body").innerHTML =
+    '<tr><td colspan="4" class="text-center">Chargement...</td></tr>';
+  document.getElementById("user-history-modal").style.display = "flex";
+
+  const { data: transactions } = await db
+    .from("transactions")
+    .select("*")
+    .eq("created_by", userId)
+    .order("created_at", { ascending: false });
+  const tbody = document.getElementById("user-history-body");
+
+  if (transactions && transactions.length > 0) {
+    tbody.innerHTML = "";
+    transactions.forEach((t) => {
+      const cost = t.quantity * t.unit_price;
+      const color = typeColors[t.item_type] || "#888";
+      const textColor = t.item_type === "Charbon Normale" ? "#333" : "#fff";
+      let badgeClass =
+        t.type === "vente"
+          ? "bg-green"
+          : t.type === "salaire"
+            ? "bg-purple"
+            : "bg-red";
+      if (t.type === "ajustement") badgeClass = "bg-blue";
+
+      tbody.innerHTML += `
+                <tr>
+                    <td>${new Date(t.created_at).toLocaleDateString()}</td>
+                    <td><span class="badge-type ${badgeClass}">${t.type.toUpperCase()}</span></td>
+                    <td><span class="badge-type" style="background-color: ${color}; color: ${textColor};">${t.item_type}</span></td>
+                    <td class="${t.type === "vente" ? "text-success" : "text-danger"}">${Math.floor(cost)} Septims</td>
+                </tr>`;
+    });
+  } else {
+    tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state"><i class="fa-solid fa-receipt"></i><p>Aucune transaction pour cet employé.</p></div></td></tr>`;
+  }
+}
+function closeUserHistory() {
+  document.getElementById("user-history-modal").style.display = "none";
+}
+
+function renderCharts(transactions) {
+  let achats = {
+    "Petit bois": 0,
+    "Charbon Pauvre": 0,
+    "Charbon Normale": 0,
+    "Briquettes de Charbon": 0,
+    "Coke de charbon": 0,
+  };
+  let ventes = {
+    "Petit bois": 0,
+    "Charbon Pauvre": 0,
+    "Charbon Normale": 0,
+    "Briquettes de Charbon": 0,
+    "Coke de charbon": 0,
+    "Location tonneau": 0,
+    "Location four": 0,
+    Ajustement: 0,
+  };
+
+  transactions.forEach((t) => {
+    const cost = t.quantity * t.unit_price;
+    if (t.type === "achat" && achats[t.item_type] !== undefined)
+      achats[t.item_type] += cost;
+    if (t.type === "vente" && ventes[t.item_type] !== undefined)
+      ventes[t.item_type] += cost;
+  });
+
+  if (chartAchatsInstance) chartAchatsInstance.destroy();
+  if (chartVentesInstance) chartVentesInstance.destroy();
+
+  const ctxA = document.getElementById("chart-achats").getContext("2d");
+  chartAchatsInstance = new Chart(ctxA, {
+    type: "doughnut",
+    data: {
+      labels: Object.keys(achats).filter((k) => achats[k] > 0),
+      datasets: [
+        {
+          data: Object.values(achats).filter((v) => v > 0),
+          backgroundColor: Object.keys(achats)
+            .filter((k) => achats[k] > 0)
+            .map((l) => typeColors[l] || "#888"),
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { position: "right", labels: { color: "#f0f0f0" } } },
+    },
+  });
+
+  const ctxV = document.getElementById("chart-ventes").getContext("2d");
+  chartVentesInstance = new Chart(ctxV, {
+    type: "doughnut",
+    data: {
+      labels: Object.keys(ventes).filter((k) => ventes[k] > 0),
+      datasets: [
+        {
+          data: Object.values(ventes).filter((v) => v > 0),
+          backgroundColor: Object.keys(ventes)
+            .filter((k) => ventes[k] > 0)
+            .map((l) => typeColors[l] || "#888"),
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { position: "right", labels: { color: "#f0f0f0" } } },
+    },
+  });
+}
+
+async function validerUtilisateur(id) {
+  const { error } = await db
+    .from("profiles")
+    .update({ is_approved: true })
+    .eq("id", id);
+  if (error) showPopup("Erreur", "Impossible.");
+  else {
+    showPopup("Validé", "Le joueur peut travailler.");
+    loadPatronData();
+  }
+}
+
+async function changerRole(id, nouveauRole) {
+  const roleNom =
+    nouveauRole === "patron"
+      ? "Patron"
+      : nouveauRole === "contremaitre"
+        ? "Contremaître"
+        : "Employé";
+  showConfirm(
+    "Changement de rôle",
+    `Nommer cet utilisateur ${roleNom} ?`,
+    async () => {
+      const { error } = await db
+        .from("profiles")
+        .update({ role: nouveauRole })
+        .eq("id", id);
+      if (error) showPopup("Erreur", "Impossible de changer le rôle.");
+      else {
+        showPopup("Succès", `Le joueur est maintenant ${roleNom}.`);
+        loadPatronData();
+      }
+    },
+  );
+}
+
+async function virerUtilisateur(id, nom) {
+  showConfirm("Virer", `VIRER ${nom} ?`, async () => {
+    const { error } = await db.rpc("supprimer_utilisateur", {
+      target_user_id: id,
+    });
+    if (error) showPopup("Erreur", "Erreur SQL.");
+    else {
+      showPopup("Viré", `${nom} supprimé.`);
+      loadPatronData();
+    }
+  });
+}
+
+async function deleteTransaction(id) {
+  showConfirm("Supprimer", "Supprimer cette transaction ?", async () => {
+    await db.from("transactions").delete().eq("id", id);
+    loadPatronData();
+    loadEmployeData();
+    loadTreasury();
+  });
+}
+
+async function paySalaries() {
+  const inputs = document.querySelectorAll('[id^="sal-amount-"]');
+  if (inputs.length === 0) return showPopup("Info", "Aucun employé à payer.");
+
+  let totalPaye = 0;
+  let transactionsToInsert = [];
+  let updates = [];
+
+  for (const input of inputs) {
+    const id = input.id.replace("sal-amount-", "");
+    const salary = parseInt(input.value) || 0;
+
+    if (salary > 0) {
+      const row = input.closest(".salary-row");
+      const nom = row.querySelector("span").innerText;
+
+      totalPaye += salary;
+      updates.push({ id: id, salary: salary });
+
+      transactionsToInsert.push({
+        type: "salaire",
+        item_type: "Salaire",
+        counterparty_name: nom,
+        quantity: 1,
+        unit_price: salary,
+        created_by: currentUser.id,
+      });
+    }
+  }
+
+  if (totalPaye === 0) {
+    return showPopup("Info", "Le total des salaires est de 0.");
+  }
+
+  showConfirm(
+    "Payer l'équipe",
+    `Confirmer le paiement de ${totalPaye} Septims ?`,
+    async () => {
+      for (const update of updates) {
+        await db
+          .from("profiles")
+          .update({ salary: update.salary })
+          .eq("id", update.id);
+      }
+
+      const { error } = await db
+        .from("transactions")
+        .insert(transactionsToInsert);
+
+      if (error) {
+        showPopup("Erreur", "Erreur lors du paiement : " + error.message);
+      } else {
+        showPopup(
+          "Salaires Payés",
+          `${totalPaye} Septims ont été distribués à l'équipe.`,
+        );
+        loadPatronData();
+        loadEmployeData();
+        loadTreasury();
+      }
+    },
+  );
+}
+
 async function loadBarrels() {
   const { data: rentals } = await db.from("barrel_rentals").select("*");
   const container = document.querySelector("#tab-location .barrels-grid");
 
   if (!container) return;
 
-  if (!document.getElementById("barrel-1")) {
+  if (container.innerHTML.trim() === "") {
     container.innerHTML = "";
     for (let i = 1; i <= 23; i++) {
       container.innerHTML += `
@@ -359,7 +1035,10 @@ async function payBarrel(id, num, clientName) {
         });
       showPopup("Payé", `50 Septims encaissés.`);
       loadBarrels();
-      if (userProfile.role === "patron") loadPatronData();
+      if (userProfile.role === "patron") {
+        loadPatronData();
+        loadTreasury();
+      }
     },
   );
 }
@@ -375,9 +1054,6 @@ async function freeBarrel(id) {
   );
 }
 
-// ==========================================
-// --- LOCATION DE FOUR ---
-// ==========================================
 async function loadFurnaces() {
   const { data: furnaces } = await db
     .from("furnace_rentals")
@@ -492,7 +1168,10 @@ async function payFurnace(id, clientName) {
 
       showPopup("Payé", `30 Septims encaissés. Prochain paiement dans 7j.`);
       loadFurnaces();
-      if (userProfile.role === "patron") loadPatronData();
+      if (userProfile.role === "patron") {
+        loadPatronData();
+        loadTreasury();
+      }
       loadEmployeData();
     },
   );
@@ -509,15 +1188,14 @@ async function freeFurnace(id) {
   );
 }
 
-// ==========================================
-// --- COMMANDES & STOCK ---
-// ==========================================
 async function createOrder(e) {
   e.preventDefault();
   const client_name = document.getElementById("ord-client").value.trim();
   const item_type = document.getElementById("ord-item").value;
   const quantity = parseFloat(document.getElementById("ord-qty").value);
-  const unit_price = parseFloat(document.getElementById("ord-price").value);
+  const unit_price = Math.floor(
+    parseFloat(document.getElementById("ord-price").value),
+  );
   const deadlineInput = document.getElementById("ord-deadline").value;
   const deadline = deadlineInput ? deadlineInput : null;
 
@@ -550,7 +1228,7 @@ async function loadOrders() {
     container.innerHTML = "";
     orders.forEach((o) => {
       const color = typeColors[o.item_type] || "#888";
-      const total = (o.quantity * o.unit_price).toFixed(2);
+      const total = Math.floor(o.quantity * o.unit_price);
       let dateHtml = o.deadline
         ? `<span class="text-warning" style="display:block; margin-top:8px;"><i class="fa-solid fa-clock"></i> Avant le : ${new Date(o.deadline).toLocaleDateString()}</span>`
         : "";
@@ -601,7 +1279,10 @@ async function honorOrder(id, client_name, item_type, quantity, unit_price) {
   loadOrders();
   loadStock();
   loadEmployeData();
-  if (userProfile.role === "patron") loadPatronData();
+  if (userProfile.role === "patron") {
+    loadPatronData();
+    loadTreasury();
+  }
 }
 
 async function cancelOrder(id) {
@@ -609,92 +1290,6 @@ async function cancelOrder(id) {
     await db.from("orders").delete().eq("id", id);
     loadOrders();
   });
-}
-
-async function loadStock() {
-  const { data: stocks } = await db.from("stocks").select("*").order("id");
-  const container = document.getElementById("stock-container");
-  container.innerHTML = "";
-  if (stocks) {
-    stocks.forEach((s) => {
-      const color = typeColors[s.item_name] || "#888";
-      const textColor = s.item_name === "Charbon Normale" ? "#333" : "#fff";
-      const qtyHtml =
-        userProfile.role === "patron"
-          ? `<input type="number" value="${s.quantity}" onchange="updateStockManual(${s.id}, this.value)">`
-          : `<div class="qty">${s.quantity}</div>`;
-      container.innerHTML += `<div class="stock-item" style="border-left-color: ${color};"><h4 style="background-color: ${color}; color: ${textColor};">${s.item_name}</h4>${qtyHtml}</div>`;
-    });
-  }
-}
-
-async function updateStockManual(id, newQty) {
-  await db
-    .from("stocks")
-    .update({ quantity: parseFloat(newQty) || 0 })
-    .eq("id", id);
-}
-
-// ==========================================
-// --- SAISIE DIRECTE & HISTORIQUE ---
-// ==========================================
-function updateBasePrice() {
-  const type = document.getElementById("emp-type").value;
-  const select = document.getElementById("emp-item");
-  const item = select.value;
-  let price =
-    type === "vente" ? basePricesVente[item] || 0 : basePricesAchat[item] || 0;
-  document.getElementById("emp-price").value = price.toFixed(2);
-  select.style.backgroundColor = typeColors[item] || "#333";
-  select.style.color = item === "Charbon Normale" ? "#333" : "#fff";
-  calcEmpTotal();
-}
-
-document.getElementById("emp-quantity").addEventListener("input", calcEmpTotal);
-document.getElementById("emp-price").addEventListener("input", calcEmpTotal);
-function calcEmpTotal() {
-  const q = parseFloat(document.getElementById("emp-quantity").value) || 0;
-  const p = parseFloat(document.getElementById("emp-price").value) || 0;
-  document.getElementById("emp-total").value = (q * p).toFixed(2) + " Septims";
-}
-
-async function addTransaction(e) {
-  e.preventDefault();
-  const type = document.getElementById("emp-type").value;
-  const item_type = document.getElementById("emp-item").value;
-  const quantity = parseFloat(document.getElementById("emp-quantity").value);
-  const unit_price = parseFloat(document.getElementById("emp-price").value);
-
-  if (type === "vente") {
-    const { data: stock } = await db
-      .from("stocks")
-      .select("quantity")
-      .eq("item_name", item_type)
-      .single();
-    if (stock && stock.quantity < quantity)
-      return showPopup(
-        "Stock Insuffisant",
-        `Il ne reste que ${stock.quantity} ${item_type}.`,
-      );
-  }
-
-  const { error } = await db
-    .from("transactions")
-    .insert({
-      type,
-      item_type,
-      counterparty_name: userProfile.full_name,
-      quantity,
-      unit_price,
-      created_by: currentUser.id,
-    });
-  if (error) showPopup("Erreur", error.message);
-  else {
-    showPopup("Succès", "Opération enregistrée !");
-    loadEmployeData();
-    loadStock();
-    if (userProfile.role === "patron") loadPatronData();
-  }
 }
 
 async function loadEmployeData() {
@@ -708,7 +1303,7 @@ async function loadEmployeData() {
   if (data && data.length > 0) {
     tbody.innerHTML = "";
     data.forEach((t) => {
-      const cost = t.quantity * t.unit_price;
+      const cost = Math.floor(t.quantity * t.unit_price);
       const color = typeColors[t.item_type] || "#888";
       const textColor = t.item_type === "Charbon Normale" ? "#333" : "#fff";
       let badgeClass =
@@ -717,412 +1312,13 @@ async function loadEmployeData() {
           : t.type === "salaire"
             ? "bg-purple"
             : "bg-red";
-      tbody.innerHTML += `<tr><td>${new Date(t.created_at).toLocaleDateString()}</td><td><span class="badge-type ${badgeClass}">${t.type.toUpperCase()}</span></td><td><span class="badge-type" style="background-color: ${color}; color: ${textColor};">${t.item_type}</span></td><td class="${t.type === "vente" ? "text-success" : "text-danger"}">${cost.toFixed(2)} Septims</td></tr>`;
+      if (t.type === "ajustement") badgeClass = "bg-blue";
+
+      tbody.innerHTML += `<tr><td>${new Date(t.created_at).toLocaleDateString()}</td><td><span class="badge-type ${badgeClass}">${t.type.toUpperCase()}</span></td><td><span class="badge-type" style="background-color: ${color}; color: ${textColor};">${t.item_type}</span></td><td class="${t.type === "vente" ? "text-success" : "text-danger"}">${cost} Septims</td></tr>`;
     });
   } else {
     tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state"><i class="fa-solid fa-receipt"></i><p>Vous n'avez encore effectué aucune opération.</p></div></td></tr>`;
   }
-}
-
-// ==========================================
-// --- VUE GESTION (PATRON UNIQUEMENT) ---
-// ==========================================
-async function loadPatronData() {
-  const { data: personnel, error } = await db
-    .from("profiles")
-    .select("*")
-    .order("created_at", { ascending: true });
-  const personnelDiv = document.getElementById("admin-personnel-list");
-  const salDiv = document.getElementById("admin-salaries-list");
-
-  personnelDiv.innerHTML = "";
-  salDiv.innerHTML = "";
-
-  if (error) {
-    personnelDiv.innerHTML = `<p class="text-danger">Erreur : ${error.message}</p>`;
-  } else if (!personnel || personnel.length === 0) {
-    personnelDiv.innerHTML = `<div class="empty-state"><i class="fa-solid fa-users-slash"></i><p>Aucun employé enregistré.</p></div>`;
-    salDiv.innerHTML = `<div class="empty-state"><p>Aucun contrat.</p></div>`;
-  } else {
-    personnel.forEach((p) => {
-      const isMe = p.id === currentUser.id;
-      let actionHtml = "";
-
-      if (p.is_approved) {
-        actionHtml = `<button class="btn-action btn-fire" onclick="event.stopPropagation(); virerUtilisateur('${p.id}', '${p.full_name}')" ${isMe ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : ""}><i class="fa-solid fa-trash"></i></button>`;
-      } else {
-        actionHtml = `<button class="btn-action btn-validate" onclick="event.stopPropagation(); validerUtilisateur('${p.id}')"><i class="fa-solid fa-check"></i></button>
-                              <button class="btn-action btn-fire" onclick="event.stopPropagation(); virerUtilisateur('${p.id}', '${p.full_name}')"><i class="fa-solid fa-trash"></i></button>`;
-      }
-
-      if (p.is_approved && p.role === "employe" && !isMe) {
-        actionHtml =
-          `<button class="btn-action btn-contremaitre" onclick="event.stopPropagation(); changerRole('${p.id}', 'contremaitre')" title="Nommer Contremaître"><i class="fa-solid fa-hard-hat"></i></button>` +
-          actionHtml;
-      }
-      if (p.is_approved && p.role === "contremaitre" && !isMe) {
-        actionHtml =
-          `<button class="btn-action btn-secondary" onclick="event.stopPropagation(); changerRole('${p.id}', 'employe')" title="Rétrograder Employé"><i class="fa-solid fa-arrow-down"></i></button>` +
-          actionHtml;
-      }
-      if (p.role === "employe" && p.is_approved && !isMe) {
-        actionHtml =
-          `<button class="btn-action btn-promote" onclick="event.stopPropagation(); changerRole('${p.id}', 'patron')" title="Promouvoir Patron"><i class="fa-solid fa-crown"></i></button>` +
-          actionHtml;
-      }
-
-      let roleBadge = "Employé";
-      let badgeColor = "var(--text-muted)";
-      if (p.role === "patron") {
-        roleBadge = "Patron";
-        badgeColor = "var(--primary)";
-      }
-      if (p.role === "contremaitre") {
-        roleBadge = "Contremaître";
-        badgeColor = "#3498db";
-      }
-
-      const statusBadge = p.is_approved
-        ? ""
-        : '<span style="color:var(--danger); font-weight:bold;">(En attente)</span>';
-
-      personnelDiv.innerHTML += `
-                <div class="personnel-row" style="cursor: pointer;" onclick="showUserHistory('${p.id}', '${p.full_name}')">
-                    <div class="personnel-info"><strong>${p.full_name} ${isMe ? "(Vous)" : ""}</strong><span>Rôle : <span style="color:${badgeColor}; font-weight:bold;">${roleBadge}</span> ${statusBadge}</span></div>
-                    <div class="personnel-actions">${actionHtml}</div>
-                </div>`;
-
-      if (p.is_approved) {
-        salDiv.innerHTML += `
-                    <div class="salary-row">
-                        <span>${p.full_name}</span>
-                        <input type="number" value="${p.salary || 0}" id="sal-amount-${p.id}" oninput="updateSalaryTotal()" placeholder="0">
-                    </div>`;
-      }
-    });
-    if (salDiv.innerHTML === "")
-      salDiv.innerHTML = `<div class="empty-state"><p>Aucun employé validé.</p></div>`;
-  }
-
-  // Calculer le total au chargement
-  updateSalaryTotal();
-
-  const { data: allTransactions } = await db
-    .from("transactions")
-    .select("*")
-    .order("created_at", { ascending: false });
-  const filtered = getFilteredTransactions(allTransactions);
-  const tbody = document.getElementById("admin-history-body");
-
-  if (filtered && filtered.length > 0) {
-    tbody.innerHTML = "";
-    let totalAchats = 0,
-      totalVentes = 0,
-      totalSalairesPayes = 0;
-
-    filtered.forEach((t) => {
-      const cost = t.quantity * t.unit_price;
-      if (t.type === "achat") totalAchats += cost;
-      else if (t.type === "salaire") totalSalairesPayes += cost;
-      else totalVentes += cost;
-
-      const color = typeColors[t.item_type] || "#888";
-      const textColor = t.item_type === "Charbon Normale" ? "#333" : "#fff";
-      let badgeClass =
-        t.type === "vente"
-          ? "bg-green"
-          : t.type === "salaire"
-            ? "bg-purple"
-            : "bg-red";
-
-      tbody.innerHTML += `
-                <tr>
-                    <td>${new Date(t.created_at).toLocaleDateString()}</td>
-                    <td>${t.counterparty_name}</td>
-                    <td><span class="badge-type ${badgeClass}">${t.type.toUpperCase()}</span></td>
-                    <td><span class="badge-type" style="background-color: ${color}; color: ${textColor};">${t.item_type}</span></td>
-                    <td class="${t.type === "vente" ? "text-success" : "text-danger"}">${cost.toFixed(2)} S</td>
-                    <td><button class="btn-icon text-danger" onclick="deleteTransaction(${t.id})"><i class="fa-solid fa-trash"></i></button></td>
-                </tr>`;
-    });
-
-    const totalDepenses = totalAchats + totalSalairesPayes;
-    document.getElementById("stat-ventes").innerText =
-      totalVentes.toFixed(2) + " S";
-    document.getElementById("stat-achats").innerText =
-      totalDepenses.toFixed(2) + " S";
-
-    const benefice = totalVentes - totalDepenses;
-    const elBenefice = document.getElementById("stat-benefice");
-    elBenefice.innerText = benefice.toFixed(2) + " S";
-    elBenefice.className = benefice >= 0 ? "text-success" : "text-danger";
-
-    renderCharts(filtered);
-  } else {
-    tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><i class="fa-solid fa-list"></i><p>Aucune transaction.</p></div></td></tr>`;
-    document.getElementById("stat-ventes").innerText = "0.00 S";
-    document.getElementById("stat-achats").innerText = "0.00 S";
-    document.getElementById("stat-benefice").innerText = "0.00 S";
-    renderCharts([]);
-  }
-}
-
-// ==========================================
-// --- CALCUL DU TOTAL DES SALAIRES ---
-// ==========================================
-function updateSalaryTotal() {
-  let total = 0;
-  document.querySelectorAll('[id^="sal-amount-"]').forEach((input) => {
-    total += parseFloat(input.value) || 0;
-  });
-  const display = document.getElementById("salary-total-display");
-  if (display) display.innerText = total.toFixed(2) + " S";
-}
-
-// ==========================================
-// --- HISTORIQUE INDIVIDUEL & GRAPHIQUES ---
-// ==========================================
-async function showUserHistory(userId, userName) {
-  document.getElementById("user-history-title").innerText =
-    `Historique de ${userName}`;
-  document.getElementById("user-history-body").innerHTML =
-    '<tr><td colspan="4" class="text-center">Chargement...</td></tr>';
-  document.getElementById("user-history-modal").style.display = "flex";
-
-  const { data: transactions } = await db
-    .from("transactions")
-    .select("*")
-    .eq("created_by", userId)
-    .order("created_at", { ascending: false });
-  const tbody = document.getElementById("user-history-body");
-
-  if (transactions && transactions.length > 0) {
-    tbody.innerHTML = "";
-    transactions.forEach((t) => {
-      const cost = t.quantity * t.unit_price;
-      const color = typeColors[t.item_type] || "#888";
-      const textColor = t.item_type === "Charbon Normale" ? "#333" : "#fff";
-      let badgeClass =
-        t.type === "vente"
-          ? "bg-green"
-          : t.type === "salaire"
-            ? "bg-purple"
-            : "bg-red";
-
-      tbody.innerHTML += `
-                <tr>
-                    <td>${new Date(t.created_at).toLocaleDateString()}</td>
-                    <td><span class="badge-type ${badgeClass}">${t.type.toUpperCase()}</span></td>
-                    <td><span class="badge-type" style="background-color: ${color}; color: ${textColor};">${t.item_type}</span></td>
-                    <td class="${t.type === "vente" ? "text-success" : "text-danger"}">${cost.toFixed(2)} Septims</td>
-                </tr>`;
-    });
-  } else {
-    tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state"><i class="fa-solid fa-receipt"></i><p>Aucune transaction pour cet employé.</p></div></td></tr>`;
-  }
-}
-function closeUserHistory() {
-  document.getElementById("user-history-modal").style.display = "none";
-}
-
-function renderCharts(transactions) {
-  let achats = {
-    "Petit bois": 0,
-    "Charbon Pauvre": 0,
-    "Charbon Normale": 0,
-    "Briquettes de Charbon": 0,
-    "Coke de charbon": 0,
-  };
-  let ventes = {
-    "Petit bois": 0,
-    "Charbon Pauvre": 0,
-    "Charbon Normale": 0,
-    "Briquettes de Charbon": 0,
-    "Coke de charbon": 0,
-    "Location tonneau": 0,
-    "Location four": 0,
-  };
-
-  transactions.forEach((t) => {
-    const cost = t.quantity * t.unit_price;
-    if (t.type === "achat" && achats[t.item_type] !== undefined)
-      achats[t.item_type] += cost;
-    if (t.type === "vente" && ventes[t.item_type] !== undefined)
-      ventes[t.item_type] += cost;
-  });
-
-  if (chartAchatsInstance) chartAchatsInstance.destroy();
-  if (chartVentesInstance) chartVentesInstance.destroy();
-
-  const ctxA = document.getElementById("chart-achats").getContext("2d");
-  chartAchatsInstance = new Chart(ctxA, {
-    type: "doughnut",
-    data: {
-      labels: Object.keys(achats).filter((k) => achats[k] > 0),
-      datasets: [
-        {
-          data: Object.values(achats).filter((v) => v > 0),
-          backgroundColor: Object.keys(achats)
-            .filter((k) => achats[k] > 0)
-            .map((l) => typeColors[l] || "#888"),
-        },
-      ],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { position: "right", labels: { color: "#f0f0f0" } } },
-    },
-  });
-
-  const ctxV = document.getElementById("chart-ventes").getContext("2d");
-  chartVentesInstance = new Chart(ctxV, {
-    type: "doughnut",
-    data: {
-      labels: Object.keys(ventes).filter((k) => ventes[k] > 0),
-      datasets: [
-        {
-          data: Object.values(ventes).filter((v) => v > 0),
-          backgroundColor: Object.keys(ventes)
-            .filter((k) => ventes[k] > 0)
-            .map((l) => typeColors[l] || "#888"),
-        },
-      ],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { position: "right", labels: { color: "#f0f0f0" } } },
-    },
-  });
-}
-
-// ==========================================
-// --- ACTIONS PATRON (GESTION PERSONNEL) ---
-// ==========================================
-async function validerUtilisateur(id) {
-  const { error } = await db
-    .from("profiles")
-    .update({ is_approved: true })
-    .eq("id", id);
-  if (error) showPopup("Erreur", "Impossible.");
-  else {
-    showPopup("Validé", "Le joueur peut travailler.");
-    loadPatronData();
-  }
-}
-
-async function changerRole(id, nouveauRole) {
-  const roleNom =
-    nouveauRole === "patron"
-      ? "Patron"
-      : nouveauRole === "contremaitre"
-        ? "Contremaître"
-        : "Employé";
-  showConfirm(
-    "Changement de rôle",
-    `Nommer cet utilisateur ${roleNom} ?`,
-    async () => {
-      const { error } = await db
-        .from("profiles")
-        .update({ role: nouveauRole })
-        .eq("id", id);
-      if (error) showPopup("Erreur", "Impossible de changer le rôle.");
-      else {
-        showPopup("Succès", `Le joueur est maintenant ${roleNom}.`);
-        loadPatronData();
-      }
-    },
-  );
-}
-
-async function virerUtilisateur(id, nom) {
-  showConfirm("Virer", `VIRER ${nom} ?`, async () => {
-    const { error } = await db.rpc("supprimer_utilisateur", {
-      target_user_id: id,
-    });
-    if (error) showPopup("Erreur", "Erreur SQL.");
-    else {
-      showPopup("Viré", `${nom} supprimé.`);
-      loadPatronData();
-    }
-  });
-}
-
-async function deleteTransaction(id) {
-  showConfirm("Supprimer", "Supprimer cette transaction ?", async () => {
-    await db.from("transactions").delete().eq("id", id);
-    loadPatronData();
-    loadEmployeData();
-  });
-}
-
-// ==========================================
-// --- PAIEMENT DES SALAIRES (FUSIONNÉ) ---
-// ==========================================
-async function paySalaries() {
-  const inputs = document.querySelectorAll('[id^="sal-amount-"]');
-  if (inputs.length === 0) return showPopup("Info", "Aucun employé à payer.");
-
-  let totalPaye = 0;
-  let transactionsToInsert = [];
-  let updates = [];
-
-  for (const input of inputs) {
-    const id = input.id.replace("sal-amount-", "");
-    const salary = parseFloat(input.value) || 0;
-
-    if (salary > 0) {
-      const row = input.closest(".salary-row");
-      const nom = row.querySelector("span").innerText;
-
-      totalPaye += salary;
-      updates.push({ id: id, salary: salary });
-
-      transactionsToInsert.push({
-        type: "salaire",
-        item_type: "Salaire",
-        counterparty_name: nom,
-        quantity: 1,
-        unit_price: salary,
-        created_by: currentUser.id,
-      });
-    }
-  }
-
-  if (totalPaye === 0) {
-    return showPopup("Info", "Le total des salaires est de 0.");
-  }
-
-  showConfirm(
-    "Payer l'équipe",
-    `Confirmer le paiement de ${totalPaye.toFixed(2)} Septims ?`,
-    async () => {
-      // 1. Mettre à jour les salaires dans les profils (pour la prochaine fois)
-      for (const update of updates) {
-        await db
-          .from("profiles")
-          .update({ salary: update.salary })
-          .eq("id", update.id);
-      }
-
-      // 2. Créer les transactions (dépenses dans la trésorerie)
-      const { error } = await db
-        .from("transactions")
-        .insert(transactionsToInsert);
-
-      if (error) {
-        showPopup("Erreur", "Erreur lors du paiement : " + error.message);
-      } else {
-        showPopup(
-          "Salaires Payés",
-          `${totalPaye.toFixed(2)} Septims ont été distribués à l'équipe.`,
-        );
-        loadPatronData(); // Rafraîchit l'interface
-        loadEmployeData();
-      }
-    },
-  );
 }
 
 // ==========================================

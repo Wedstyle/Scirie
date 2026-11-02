@@ -272,8 +272,7 @@ header {
   max-width: 1200px;
   margin: 0 auto;
   width: 100%;
-} /* Centre le contenu */
-
+}
 .page-title {
   font-size: 1.5em;
   margin-bottom: 20px;
@@ -298,7 +297,7 @@ header {
   }
 }
 
-/* --- CARTES --- */
+/* --- CARTES & GRILLES --- */
 .card {
   background: var(--bg-card);
   padding: 18px;
@@ -646,6 +645,10 @@ header {
 .btn-fire {
   background: var(--danger);
 }
+.btn-contremaitre {
+  background: #3498db;
+  color: white;
+}
 
 /* --- COMMANDES --- */
 .orders-grid {
@@ -703,10 +706,10 @@ header {
   background: var(--danger);
 }
 
-/* --- STOCK --- */
+/* --- STOCK (MIS À JOUR) --- */
 .stock-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: 15px;
 }
 .stock-item {
@@ -716,6 +719,8 @@ header {
   text-align: center;
   border: 1px solid var(--border);
   border-left: 4px solid var(--primary);
+  display: flex;
+  flex-direction: column;
 }
 .stock-item h4 {
   font-size: 0.9em;
@@ -727,26 +732,119 @@ header {
   font-size: 1.8em;
   font-weight: 700;
   color: var(--success);
+  margin-bottom: 10px;
 }
-.stock-item input {
-  width: 100px;
-  font-size: 1.4em;
+.stock-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+  margin-top: auto;
+}
+.stock-controls input {
+  width: 100%;
+  padding: 10px;
   text-align: center;
-  background: transparent;
-  border: 1px solid var(--primary);
-  color: var(--success);
+  font-size: 1.1em;
+  font-weight: bold;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: white;
   border-radius: 4px;
-  font-weight: 700;
   outline: none;
 }
+.stock-controls input:focus {
+  border-color: var(--primary);
+}
+.stock-buttons {
+  display: flex;
+  gap: 8px;
+}
+.stock-buttons button {
+  flex: 1;
+  padding: 8px;
+  font-size: 0.85em;
+  font-weight: bold;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  color: white;
+  transition: 0.2s;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+}
+.btn-add {
+  background: var(--success);
+}
+.btn-sub {
+  background: var(--danger);
+}
 
-/* --- ÉTATS VIDES (EMPTY STATES) --- */
+/* --- SECTION SALAIRES --- */
+.salary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-input);
+  padding: 10px 15px;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  border: 1px solid var(--border);
+}
+.salary-row span {
+  font-weight: 500;
+  font-size: 0.95em;
+}
+.salary-row input {
+  width: 90px;
+  padding: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-main);
+  border-radius: 4px;
+  text-align: right;
+  font-weight: 600;
+  font-size: 1em;
+  outline: none;
+}
+.salary-row input:focus {
+  border-color: var(--primary);
+}
+.salary-total-box {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: 6px;
+  margin-bottom: 15px;
+  font-weight: 600;
+}
+.btn-pay-salary {
+  background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+  color: white;
+  padding: 12px;
+  font-size: 1.05em;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+}
+.btn-pay-salary:hover {
+  background: linear-gradient(135deg, #a78bfa, #7c3aed);
+}
+
+/* --- ÉTATS VIDES --- */
 .empty-state {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 40px 20px;
+  padding: 30px 20px;
   color: var(--text-muted);
   text-align: center;
   background: rgba(0, 0, 0, 0.1);
@@ -809,71 +907,4 @@ header {
   color: var(--text-muted);
   font-size: 0.9em;
   line-height: 1.4;
-}
-/* --- BOUTON CONTREMAÎTRE --- */
-.btn-contremaitre {
-  background: #3498db;
-  color: white;
-}
-.btn-contremaitre:hover {
-  filter: brightness(1.1);
-}
-/* --- SECTION SALAIRES --- */
-.salary-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: var(--bg-input);
-  padding: 10px 15px;
-  border-radius: 6px;
-  margin-bottom: 8px;
-  border: 1px solid var(--border);
-}
-
-.salary-row span {
-  font-weight: 500;
-  font-size: 0.95em;
-}
-
-.salary-row input {
-  width: 90px;
-  padding: 8px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  color: var(--text-main);
-  border-radius: 4px;
-  text-align: right;
-  font-weight: 600;
-  font-size: 1em;
-  outline: none;
-}
-.salary-row input:focus {
-  border-color: var(--primary);
-}
-
-.salary-total-box {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 15px;
-  background: rgba(16, 185, 129, 0.1);
-  border: 1px solid rgba(16, 185, 129, 0.2);
-  border-radius: 6px;
-  margin-bottom: 15px;
-  font-weight: 600;
-}
-
-.btn-pay-salary {
-  background: linear-gradient(135deg, #8b5cf6, #6d28d9);
-  color: white;
-  padding: 12px;
-  font-size: 1.05em;
-  box-shadow: 0 4px 10px rgba(139, 92, 246, 0.3);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 8px;
-}
-.btn-pay-salary:hover {
-  background: linear-gradient(135deg, #a78bfa, #7c3aed);
 }

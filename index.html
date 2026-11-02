@@ -201,8 +201,8 @@
                         ><input
                           type="number"
                           id="ord-price"
-                          step="0.01"
-                          value="1.00"
+                          step="1"
+                          value="1"
                           required
                         />
                       </div>
@@ -226,7 +226,133 @@
             <!-- ONGLET STOCK -->
             <section id="tab-stock" class="tab-content">
               <h2 class="page-title">État du Stock</h2>
+
+              <!-- TRÉSORERIE -->
+              <div
+                id="treasury-card"
+                class="card"
+                style="display: none; border: 1px solid var(--primary)"
+              >
+                <h3 style="color: var(--primary)">
+                  <i class="fa-solid fa-vault"></i> Trésorerie de la Scierie
+                </h3>
+
+                <div
+                  style="
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    flex-wrap: wrap;
+                    gap: 20px;
+                  "
+                >
+                  <!-- MODIFICATION DIRECTE (Clic sur le chiffre) -->
+                  <div>
+                    <span
+                      style="
+                        font-size: 0.85em;
+                        color: var(--text-muted);
+                        display: block;
+                        margin-bottom: 8px;
+                      "
+                      >Fonds actuels (cliquez sur le chiffre pour
+                      modifier)</span
+                    >
+                    <!-- Boîte cliquable -->
+                    <div
+                      style="
+                        background: var(--bg-input);
+                        padding: 10px 15px;
+                        border-radius: var(--radius);
+                        border: 1px solid var(--border);
+                        display: flex;
+                        align-items: center;
+                        gap: 10px;
+                        transition: 0.2s;
+                        cursor: text;
+                      "
+                      onclick="
+                        document.getElementById('current-treasury').focus()
+                      "
+                    >
+                      <input
+                        type="number"
+                        id="current-treasury"
+                        style="
+                          font-size: 1.8em;
+                          font-weight: 700;
+                          color: var(--success);
+                          background: transparent;
+                          border: none;
+                          outline: none;
+                          width: 120px;
+                          padding: 0;
+                        "
+                        onchange="updateTreasuryDirect(this)"
+                      />
+
+                      <span
+                        style="
+                          font-size: 1.1em;
+                          font-weight: 700;
+                          color: var(--success);
+                        "
+                        >Septims</span
+                      >
+                      <i
+                        class="fa-solid fa-pen"
+                        style="
+                          color: var(--text-muted);
+                          font-size: 0.9em;
+                          margin-left: 5px;
+                        "
+                      ></i>
+                    </div>
+                  </div>
+
+                  <!-- AJOUT / RETRAIT RAPIDE (Boutons) -->
+                  <div style="display: flex; gap: 10px; align-items: flex-end">
+                    <div class="input-group" style="margin-bottom: 0">
+                      <label>Montant rapide</label>
+                      <input
+                        type="number"
+                        id="manual-amount"
+                        placeholder="Ex: 100"
+                        style="width: 120px; padding: 10px"
+                      />
+                    </div>
+                    <button
+                      class="btn-primary"
+                      style="
+                        width: auto;
+                        background: var(--success);
+                        padding: 10px 15px;
+                        height: 38px;
+                      "
+                      onclick="adjustTreasury(1)"
+                      title="Ajouter des Septims"
+                    >
+                      <i class="fa-solid fa-plus"></i> Ajouter
+                    </button>
+                    <button
+                      class="btn-primary"
+                      style="
+                        width: auto;
+                        background: var(--danger);
+                        padding: 10px 15px;
+                        height: 38px;
+                      "
+                      onclick="adjustTreasury(-1)"
+                      title="Retirer des Septims"
+                    >
+                      <i class="fa-solid fa-minus"></i> Retirer
+                    </button>
+                  </div>
+                </div>
+              </div>
+
               <div class="card">
+                <h3>Ressources en stock</h3>
                 <div class="stock-grid" id="stock-container"></div>
               </div>
             </section>
@@ -286,8 +412,8 @@
                         ><input
                           type="number"
                           id="emp-price"
-                          step="0.01"
-                          value="0.20"
+                          step="1"
+                          value="1"
                           required
                         />
                       </div>
@@ -296,7 +422,7 @@
                         ><input
                           type="text"
                           id="emp-total"
-                          value="0.20 Septims"
+                          value="1 Septims"
                           disabled
                           class="highlight-input"
                         />
@@ -352,7 +478,7 @@
                           margin-bottom: 5px;
                         "
                       >
-                        <span>Petit bois :</span> <span>0.20 S</span>
+                        <span>Petit bois :</span> <span>1 S</span>
                       </li>
                       <li
                         style="
@@ -361,7 +487,7 @@
                           margin-bottom: 5px;
                         "
                       >
-                        <span>Charbon Pauvre :</span> <span>0.50 S</span>
+                        <span>Charbon Pauvre :</span> <span>1 S</span>
                       </li>
                       <li
                         style="
@@ -370,7 +496,7 @@
                           margin-bottom: 5px;
                         "
                       >
-                        <span>Charbon Normale :</span> <span>1.00 S</span>
+                        <span>Charbon Normale :</span> <span>1 S</span>
                       </li>
                       <li
                         style="
@@ -379,10 +505,10 @@
                           margin-bottom: 5px;
                         "
                       >
-                        <span>Briquettes :</span> <span>4.00 S</span>
+                        <span>Briquettes :</span> <span>4 S</span>
                       </li>
                       <li style="display: flex; justify-content: space-between">
-                        <span>Coke de charbon :</span> <span>6.00 S</span>
+                        <span>Coke de charbon :</span> <span>6 S</span>
                       </li>
                     </ul>
                   </div>
@@ -493,15 +619,15 @@
               <div class="stats-grid">
                 <div class="stat-card bg-green">
                   <h3>Ventes (Période)</h3>
-                  <p id="stat-ventes">0.00 S</p>
+                  <p id="stat-ventes">0 S</p>
                 </div>
                 <div class="stat-card bg-red">
                   <h3>Dépenses (Période)</h3>
-                  <p id="stat-achats">0.00 S</p>
+                  <p id="stat-achats">0 S</p>
                 </div>
                 <div class="stat-card bg-orange">
                   <h3>Bénéfice (Période)</h3>
-                  <p id="stat-benefice">0.00 S</p>
+                  <p id="stat-benefice">0 S</p>
                 </div>
               </div>
 
@@ -558,7 +684,7 @@
                           font-size: 1.2em;
                           font-weight: 700;
                         "
-                        >0.00 S</span
+                        >0 S</span
                       >
                     </div>
 
