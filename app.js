@@ -13,18 +13,18 @@ let currentBarrelToAllocate = null;
 let realtimeChannel = null;
 
 const basePricesVente = {
-  "Petit bois": 1,
-  "Charbon Pauvre": 1,
-  "Charbon Normale": 1,
-  "Briquettes de Charbon": 4,
+  "Petit bois": 0.2,
+  "Charbon Pauvre": 0.7,
+  "Charbon Normale": 1.3,
+  "Briquettes de Charbon": 3,
   "Coke de charbon": 6,
 };
 const basePricesAchat = {
-  "Petit bois": 1,
-  "Charbon Pauvre": 1,
-  "Charbon Normale": 1,
-  "Briquettes de Charbon": 3,
-  "Coke de charbon": 5,
+  "Petit bois": 0.15,
+  "Charbon Pauvre": 0.3,
+  "Charbon Normale": 0.8,
+  "Briquettes de Charbon": 1.5,
+  "Coke de charbon": 3,
 };
 const typeColors = {
   "Petit bois": "#8B4513",
@@ -245,15 +245,28 @@ async function checkUserStatus() {
 }
 
 // ==========================================
-// --- REALTIME (MISE À JOUR EN DIRECT) ---
+// --- REALTIME (MISE À JOUR EN DIRECT OPTIMISÉE) ---
 // ==========================================
 function setupRealtime() {
+  if (realtimeChannel) db.removeChannel(realtimeChannel);
+
+  const isTyping = () => {
+    const active = document.activeElement;
+    return (
+      active &&
+      (active.tagName === "INPUT" ||
+        active.tagName === "SELECT" ||
+        active.tagName === "TEXTAREA")
+    );
+  };
+
   realtimeChannel = db
     .channel("custom-all-channel")
     .on(
       "postgres_changes",
       { event: "*", schema: "public", table: "transactions" },
       () => {
+        if (isTyping()) return;
         loadPatronData();
         loadEmployeData();
         loadTreasury();
@@ -263,6 +276,7 @@ function setupRealtime() {
       "postgres_changes",
       { event: "*", schema: "public", table: "stocks" },
       () => {
+        if (isTyping()) return;
         loadStock();
       },
     )
@@ -270,6 +284,7 @@ function setupRealtime() {
       "postgres_changes",
       { event: "*", schema: "public", table: "profiles" },
       () => {
+        if (isTyping()) return;
         loadPatronData();
       },
     )
@@ -277,6 +292,7 @@ function setupRealtime() {
       "postgres_changes",
       { event: "*", schema: "public", table: "barrel_rentals" },
       () => {
+        if (isTyping()) return;
         loadBarrels();
       },
     )
@@ -284,6 +300,7 @@ function setupRealtime() {
       "postgres_changes",
       { event: "*", schema: "public", table: "furnace_rentals" },
       () => {
+        if (isTyping()) return;
         loadFurnaces();
       },
     )
@@ -291,10 +308,14 @@ function setupRealtime() {
       "postgres_changes",
       { event: "*", schema: "public", table: "orders" },
       () => {
+        if (isTyping()) return;
         loadOrders();
       },
     )
-    .subscribe();
+    .subscribe((status) => {
+      if (status === "SUBSCRIBED")
+        console.log("✅ Connecté au flux temps réel.");
+    });
 }
 
 // ==========================================
@@ -460,7 +481,7 @@ async function adjustStock(id, currentQty, operation) {
 }
 
 // ==========================================
-// --- SAISIE DIRECTE (AVEC DIVERS) ---
+// --- SAISIE DIRECTE (AVEC DIVERS & DÉCIMALES) ---
 // ==========================================
 function updateBasePrice() {
   const type = document.getElementById("emp-type").value;
@@ -473,11 +494,12 @@ function updateBasePrice() {
     document.getElementById("emp-price").value = "";
   } else {
     customRow.style.display = "none";
+    // ON GARDE LES DÉCIMALES ICI
     let price =
       type === "vente"
         ? basePricesVente[item] || 0
         : basePricesAchat[item] || 0;
-    document.getElementById("emp-price").value = Math.floor(price);
+    document.getElementById("emp-price").value = price;
   }
 
   if (select.value !== "Divers") {
@@ -496,7 +518,8 @@ document.getElementById("emp-price").addEventListener("input", calcEmpTotal);
 function calcEmpTotal() {
   const q = parseFloat(document.getElementById("emp-quantity").value) || 0;
   const p = parseFloat(document.getElementById("emp-price").value) || 0;
-  document.getElementById("emp-total").value = Math.floor(q * p) + " Septimes";
+  // On arrondit SEULEMENT le total final
+  document.getElementById("emp-total").value = (q * p).toFixed(2) + " S";
 }
 
 async function addTransaction(e) {
@@ -504,9 +527,8 @@ async function addTransaction(e) {
   const type = document.getElementById("emp-type").value;
   let item_type = document.getElementById("emp-item").value;
   const quantity = parseFloat(document.getElementById("emp-quantity").value);
-  const unit_price = Math.floor(
-    parseFloat(document.getElementById("emp-price").value),
-  );
+  // ON GARDE LES DÉCIMALES POUR LE PRIX UNITAIRE
+  const unit_price = parseFloat(document.getElementById("emp-price").value);
 
   if (item_type === "Divers") {
     const customName = document.getElementById("emp-custom-item").value.trim();
@@ -669,26 +691,27 @@ async function loadPatronData() {
         textClass = cost >= 0 ? "text-success" : "text-danger";
       }
 
+      // On affiche le coût arrondi, mais on garde la vraie valeur pour les stats
       tbody.innerHTML += `
                 <tr>
                     <td>${new Date(t.created_at).toLocaleDateString()}</td>
                     <td>${t.counterparty_name}</td>
                     <td><span class="badge-type ${badgeClass}" style="${t.type === "ajustement" ? "background-color: #3b82f6; color: white;" : ""}">${t.type.toUpperCase()}</span></td>
                     <td><span class="badge-type" style="background-color: ${color}; color: ${textColor};">${t.item_type}</span></td>
-                    <td class="${textClass}">${Math.floor(cost)} S</td>
+                    <td class="${textClass}">${Math.round(cost)} S</td>
                     <td><button class="btn-icon text-danger" onclick="deleteTransaction(${t.id})"><i class="fa-solid fa-trash"></i></button></td>
                 </tr>`;
     });
 
     const totalDepenses = totalAchats + totalSalairesPayes;
     document.getElementById("stat-ventes").innerText =
-      Math.floor(totalVentes) + " S";
+      Math.round(totalVentes) + " S";
     document.getElementById("stat-achats").innerText =
-      Math.floor(totalDepenses) + " S";
+      Math.round(totalDepenses) + " S";
 
     const benefice = totalVentes - totalDepenses;
     const elBenefice = document.getElementById("stat-benefice");
-    elBenefice.innerText = Math.floor(benefice) + " S";
+    elBenefice.innerText = Math.round(benefice) + " S";
     elBenefice.className = benefice >= 0 ? "text-success" : "text-danger";
 
     renderCharts(filtered);
@@ -858,7 +881,7 @@ async function showUserHistory(userId, userName) {
             : "bg-red";
       if (t.type === "ajustement") badgeClass = "bg-blue";
 
-      tbody.innerHTML += `<tr><td>${new Date(t.created_at).toLocaleDateString()}</td><td><span class="badge-type ${badgeClass}">${t.type.toUpperCase()}</span></td><td><span class="badge-type" style="background-color: ${color}; color: ${textColor};">${t.item_type}</span></td><td class="${t.type === "vente" ? "text-success" : "text-danger"}">${Math.floor(cost)} Septims</td></tr>`;
+      tbody.innerHTML += `<tr><td>${new Date(t.created_at).toLocaleDateString()}</td><td><span class="badge-type ${badgeClass}">${t.type.toUpperCase()}</span></td><td><span class="badge-type" style="background-color: ${color}; color: ${textColor};">${t.item_type}</span></td><td class="${t.type === "vente" ? "text-success" : "text-danger"}">${Math.round(cost)} Septims</td></tr>`;
     });
   } else {
     tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state"><i class="fa-solid fa-receipt"></i><p>Aucune transaction.</p></div></td></tr>`;
@@ -1121,23 +1144,19 @@ async function updateBarrelPrice(id, newPrice) {
   else loadBarrels();
 }
 
-// LA CORRECTION EST ICI : On lit la valeur de l'input directement au moment du clic
 async function payBarrel(id, num, clientName) {
-  let finalPrice = 50; // Valeur par défaut
+  let finalPrice = 50;
 
-  // On cherche la carte du tonneau pour récupérer la valeur exacte tapée dans l'input
   const card = document.getElementById(`barrel-${num}`);
   if (card) {
     const priceInput = card.querySelector('input[type="number"]');
     if (priceInput) {
       finalPrice = parseFloat(priceInput.value) || 50;
-      // On sauvegarde le prix immédiatement au cas où l'utilisateur n'aurait pas cliqué ailleurs
       await db
         .from("barrel_rentals")
         .update({ price: finalPrice })
         .eq("id", id);
     } else {
-      // Si pas d'input (c'est un employé), on va chercher le prix en base de données
       const { data } = await db
         .from("barrel_rentals")
         .select("price")
@@ -1317,9 +1336,8 @@ async function createOrder(e) {
   const client_name = document.getElementById("ord-client").value.trim();
   const item_type = document.getElementById("ord-item").value;
   const quantity = parseFloat(document.getElementById("ord-qty").value);
-  const unit_price = Math.floor(
-    parseFloat(document.getElementById("ord-price").value),
-  );
+  // ON GARDE LES DÉCIMALES ICI AUSSI
+  const unit_price = parseFloat(document.getElementById("ord-price").value);
   const deadline = document.getElementById("ord-deadline").value || null;
 
   const { error } = await db
@@ -1351,7 +1369,7 @@ async function loadOrders() {
     container.innerHTML = "";
     orders.forEach((o) => {
       const color = typeColors[o.item_type] || "#888";
-      const total = Math.floor(o.quantity * o.unit_price);
+      const total = Math.round(o.quantity * o.unit_price);
       let dateHtml = o.deadline
         ? `<span class="text-warning" style="display:block; margin-top:8px;"><i class="fa-solid fa-clock"></i> Avant le : ${new Date(o.deadline).toLocaleDateString()}</span>`
         : "";
@@ -1423,7 +1441,7 @@ async function loadEmployeData() {
   if (data && data.length > 0) {
     tbody.innerHTML = "";
     data.forEach((t) => {
-      const cost = Math.floor(t.quantity * t.unit_price);
+      const cost = t.quantity * t.unit_price;
       const color = typeColors[t.item_type] || "#888";
       const textColor = t.item_type === "Charbon Normale" ? "#333" : "#fff";
       let badgeClass =
@@ -1433,7 +1451,7 @@ async function loadEmployeData() {
             ? "bg-purple"
             : "bg-red";
       if (t.type === "ajustement") badgeClass = "bg-blue";
-      tbody.innerHTML += `<tr><td>${new Date(t.created_at).toLocaleDateString()}</td><td><span class="badge-type ${badgeClass}">${t.type.toUpperCase()}</span></td><td><span class="badge-type" style="background-color: ${color}; color: ${textColor};">${t.item_type}</span></td><td class="${t.type === "vente" ? "text-success" : "text-danger"}">${cost} Septims</td></tr>`;
+      tbody.innerHTML += `<tr><td>${new Date(t.created_at).toLocaleDateString()}</td><td><span class="badge-type ${badgeClass}">${t.type.toUpperCase()}</span></td><td><span class="badge-type" style="background-color: ${color}; color: ${textColor};">${t.item_type}</span></td><td class="${t.type === "vente" ? "text-success" : "text-danger"}">${Math.round(cost)} Septims</td></tr>`;
     });
   } else {
     tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state"><i class="fa-solid fa-receipt"></i><p>Aucune opération.</p></div></td></tr>`;
