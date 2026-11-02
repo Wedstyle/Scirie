@@ -10,6 +10,7 @@ let chartAchatsInstance = null;
 let chartVentesInstance = null;
 let currentPeriod = "all";
 let currentBarrelToAllocate = null;
+let realtimeChannel = null;
 
 const basePricesVente = {
   "Petit bois": 1,
@@ -35,6 +36,7 @@ const typeColors = {
   "Location tonneau": "#d4af37",
   "Location four": "#e67e22",
   Ajustement: "#3b82f6",
+  Divers: "#94A3B8",
 };
 
 // ==========================================
@@ -110,7 +112,7 @@ function getFilteredTransactions(transactions) {
 }
 
 // ==========================================
-// --- AUTHENTIFICATION ---
+// --- AUTHENTIFICATION & INITIALISATION ---
 // ==========================================
 async function register() {
   const pseudo = document.getElementById("reg-pseudo").value.trim();
@@ -150,13 +152,11 @@ async function login() {
 }
 
 async function logout() {
+  if (realtimeChannel) db.removeChannel(realtimeChannel);
   await db.auth.signOut();
   location.reload();
 }
 
-// ==========================================
-// --- INITIALISATION & RÔLES ---
-// ==========================================
 async function checkUserStatus() {
   let { data: profile } = await db
     .from("profiles")
@@ -186,7 +186,6 @@ async function checkUserStatus() {
   document.getElementById("pending-screen").style.display = "none";
   document.getElementById("app-screen").style.display = "block";
 
-  // Configuration des menus selon le rôle
   if (profile.role === "patron") {
     document.getElementById("nav-gestion").style.display = "flex";
     document.getElementById("nav-location").style.display = "flex";
@@ -242,22 +241,73 @@ async function checkUserStatus() {
   loadTreasury();
   loadOrders();
   updateBasePrice();
+  setupRealtime();
+}
+
+// ==========================================
+// --- REALTIME (MISE À JOUR EN DIRECT) ---
+// ==========================================
+function setupRealtime() {
+  realtimeChannel = db
+    .channel("custom-all-channel")
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "transactions" },
+      () => {
+        loadPatronData();
+        loadEmployeData();
+        loadTreasury();
+      },
+    )
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "stocks" },
+      () => {
+        loadStock();
+      },
+    )
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "profiles" },
+      () => {
+        loadPatronData();
+      },
+    )
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "barrel_rentals" },
+      () => {
+        loadBarrels();
+      },
+    )
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "furnace_rentals" },
+      () => {
+        loadFurnaces();
+      },
+    )
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "orders" },
+      () => {
+        loadOrders();
+      },
+    )
+    .subscribe();
 }
 
 // ==========================================
 // --- TRÉSORERIE (PATRON) ---
 // ==========================================
 async function loadTreasury() {
-  if (userProfile.role !== "patron") return;
-
+  if (!userProfile || userProfile.role !== "patron") return;
   const { data: transactions } = await db.from("transactions").select("*");
   if (!transactions) return;
-
   let totalAchats = 0,
     totalVentes = 0,
     totalSalaires = 0,
     totalAjustements = 0;
-
   transactions.forEach((t) => {
     const cost = t.quantity * t.unit_price;
     if (t.type === "achat") totalAchats += cost;
@@ -265,27 +315,19 @@ async function loadTreasury() {
     else if (t.type === "vente") totalVentes += cost;
     else if (t.type === "ajustement") totalAjustements += cost;
   });
-
   const treasury = totalVentes - totalAchats - totalSalaires + totalAjustements;
-
   const el = document.getElementById("current-treasury");
   if (el) el.value = Math.floor(treasury);
 }
 
 async function updateTreasuryDirect(input) {
   const newValue = parseInt(input.value);
-
-  if (isNaN(newValue) || newValue < 0) {
-    loadTreasury();
-    return;
-  }
-
+  if (isNaN(newValue) || newValue < 0) return loadTreasury();
   const { data: transactions } = await db.from("transactions").select("*");
   let totalAchats = 0,
     totalVentes = 0,
     totalSalaires = 0,
     totalAjustements = 0;
-
   transactions.forEach((t) => {
     const cost = t.quantity * t.unit_price;
     if (t.type === "achat") totalAchats += cost;
@@ -293,27 +335,25 @@ async function updateTreasuryDirect(input) {
     else if (t.type === "vente") totalVentes += cost;
     else if (t.type === "ajustement") totalAjustements += cost;
   });
-
   const currentTreasury = Math.floor(
     totalVentes - totalAchats - totalSalaires + totalAjustements,
   );
   const difference = newValue - currentTreasury;
-
   if (difference === 0) return;
-
   showConfirm(
     "Modification directe",
     `Voulez-vous ajuster la trésorerie de ${difference > 0 ? "+" : ""}${difference} Septims ?`,
     async () => {
-      const { error } = await db.from("transactions").insert({
-        type: "ajustement",
-        item_type: "Ajustement",
-        counterparty_name: "Modification directe (Patron)",
-        quantity: 1,
-        unit_price: difference,
-        created_by: currentUser.id,
-      });
-
+      const { error } = await db
+        .from("transactions")
+        .insert({
+          type: "ajustement",
+          item_type: "Ajustement",
+          counterparty_name: "Modification directe (Patron)",
+          quantity: 1,
+          unit_price: difference,
+          created_by: currentUser.id,
+        });
       if (error) {
         showPopup("Erreur", error.message);
         loadTreasury();
@@ -328,33 +368,27 @@ async function updateTreasuryDirect(input) {
 async function adjustTreasury(type) {
   const amountInput = document.getElementById("manual-amount");
   const amount = parseInt(amountInput.value);
-
   if (!amount || amount <= 0)
     return showPopup("Erreur", "Veuillez entrer un montant supérieur à 0.");
-
   const amountValue = type === 1 ? amount : -amount;
   const action = type === 1 ? "Ajouter" : "Retirer";
-
   showConfirm(
-    `Ajustement de trésorerie`,
+    `Ajustement`,
     `Voulez-vous ${action.toLowerCase()} ${amount} Septims ?`,
     async () => {
-      const { error } = await db.from("transactions").insert({
-        type: "ajustement",
-        item_type: "Ajustement",
-        counterparty_name: `Manuel (Patron - ${action})`,
-        quantity: 1,
-        unit_price: amountValue,
-        created_by: currentUser.id,
-      });
-
-      if (error) {
-        showPopup("Erreur", error.message);
-      } else {
-        showPopup(
-          "Succès",
-          `${amount} Septims ont été ${action.toLowerCase()}s.`,
-        );
+      const { error } = await db
+        .from("transactions")
+        .insert({
+          type: "ajustement",
+          item_type: "Ajustement",
+          counterparty_name: `Manuel (Patron - ${action})`,
+          quantity: 1,
+          unit_price: amountValue,
+          created_by: currentUser.id,
+        });
+      if (error) showPopup("Erreur", error.message);
+      else {
+        showPopup("Succès", `${amount} Septims ${action.toLowerCase()}s.`);
         amountInput.value = "";
         loadTreasury();
         loadPatronData();
@@ -373,9 +407,7 @@ async function loadStock() {
     .order("id");
   const container = document.getElementById("stock-container");
   if (!container) return;
-
   container.innerHTML = "";
-
   if (error) {
     container.innerHTML = `<p class="text-danger">Erreur de chargement.</p>`;
     return;
@@ -385,7 +417,6 @@ async function loadStock() {
     stocks.forEach((s) => {
       const color = typeColors[s.item_name] || "#888";
       const textColor = s.item_name === "Charbon Normale" ? "#333" : "#fff";
-
       const controlsHtml =
         userProfile.role === "patron"
           ? `
@@ -398,7 +429,6 @@ async function loadStock() {
                 </div>
             `
           : "";
-
       container.innerHTML += `
                 <div class="stock-item" style="border-left-color: ${color};">
                     <h4 style="background-color: ${color}; color: ${textColor};">${s.item_name}</h4>
@@ -415,61 +445,77 @@ async function loadStock() {
 async function adjustStock(id, currentQty, operation) {
   const input = document.getElementById(`stock-qty-${id}`);
   const amount = parseInt(input.value);
-
-  if (!amount || amount <= 0)
-    return showPopup("Erreur", "Veuillez entrer une quantité valide.");
-
+  if (!amount || amount <= 0) return showPopup("Erreur", "Quantité invalide.");
   let newQty = operation === 1 ? currentQty + amount : currentQty - amount;
   if (newQty < 0) newQty = 0;
-
   const { error } = await db
     .from("stocks")
     .update({ quantity: newQty })
     .eq("id", id);
-
-  if (error) {
-    showPopup("Erreur", "Impossible de modifier le stock.");
-  } else {
+  if (error) showPopup("Erreur", "Impossible de modifier le stock.");
+  else {
     input.value = "";
     loadStock();
   }
 }
 
 // ==========================================
-// --- SAISIE DIRECTE ---
+// --- SAISIE DIRECTE (AVEC DIVERS) ---
 // ==========================================
 function updateBasePrice() {
   const type = document.getElementById("emp-type").value;
   const select = document.getElementById("emp-item");
   const item = select.value;
-  let price =
-    type === "vente" ? basePricesVente[item] || 0 : basePricesAchat[item] || 0;
+  const customRow = document.getElementById("custom-item-row");
 
-  document.getElementById("emp-price").value = Math.floor(price);
+  if (item === "Divers") {
+    customRow.style.display = "flex";
+    document.getElementById("emp-price").value = "";
+  } else {
+    customRow.style.display = "none";
+    let price =
+      type === "vente"
+        ? basePricesVente[item] || 0
+        : basePricesAchat[item] || 0;
+    document.getElementById("emp-price").value = Math.floor(price);
+  }
 
-  select.style.backgroundColor = typeColors[item] || "#333";
-  select.style.color = item === "Charbon Normale" ? "#333" : "#fff";
+  if (select.value !== "Divers") {
+    select.style.backgroundColor = typeColors[item] || "#333";
+    select.style.color = item === "Charbon Normale" ? "#333" : "#fff";
+  } else {
+    select.style.backgroundColor = "transparent";
+    select.style.color = "var(--text-main)";
+  }
   calcEmpTotal();
 }
 
 document.getElementById("emp-quantity").addEventListener("input", calcEmpTotal);
 document.getElementById("emp-price").addEventListener("input", calcEmpTotal);
+
 function calcEmpTotal() {
   const q = parseFloat(document.getElementById("emp-quantity").value) || 0;
   const p = parseFloat(document.getElementById("emp-price").value) || 0;
-  document.getElementById("emp-total").value = Math.floor(q * p) + " Septims";
+  document.getElementById("emp-total").value = Math.floor(q * p) + " Septimes";
 }
 
 async function addTransaction(e) {
   e.preventDefault();
   const type = document.getElementById("emp-type").value;
-  const item_type = document.getElementById("emp-item").value;
+  let item_type = document.getElementById("emp-item").value;
   const quantity = parseFloat(document.getElementById("emp-quantity").value);
   const unit_price = Math.floor(
     parseFloat(document.getElementById("emp-price").value),
   );
 
-  if (type === "vente") {
+  if (item_type === "Divers") {
+    const customName = document.getElementById("emp-custom-item").value.trim();
+    if (!customName)
+      return showPopup("Erreur", "Veuillez préciser ce que vous achetez.");
+    item_type = customName;
+  }
+
+  if (type === "vente" && item_type !== "Divers") {
     const { data: stock } = await db
       .from("stocks")
       .select("quantity")
@@ -482,22 +528,22 @@ async function addTransaction(e) {
       );
   }
 
-  const { error } = await db
-    .from("transactions")
-    .insert({
-      type,
-      item_type,
-      counterparty_name: userProfile.full_name,
-      quantity,
-      unit_price,
-      created_by: currentUser.id,
-    });
+  const { error } = await db.from("transactions").insert({
+    type,
+    item_type,
+    counterparty_name: userProfile.full_name,
+    quantity,
+    unit_price,
+    created_by: currentUser.id,
+  });
 
   if (error) showPopup("Erreur", error.message);
   else {
     showPopup("Succès", "Opération enregistrée !");
+    document.getElementById("emp-custom-item").value = "";
+    document.getElementById("emp-quantity").value = 1;
     loadEmployeData();
-    loadStock();
+    if (type !== "Divers") loadStock();
     if (userProfile.role === "patron") {
       loadPatronData();
       loadTreasury();
@@ -515,6 +561,7 @@ async function loadPatronData() {
     .order("created_at", { ascending: true });
   const personnelDiv = document.getElementById("admin-personnel-list");
   const salDiv = document.getElementById("admin-salaries-list");
+  if (!personnelDiv || !salDiv) return;
 
   personnelDiv.innerHTML = "";
   salDiv.innerHTML = "";
@@ -522,38 +569,34 @@ async function loadPatronData() {
   if (error) {
     personnelDiv.innerHTML = `<p class="text-danger">Erreur : ${error.message}</p>`;
   } else if (!personnel || personnel.length === 0) {
-    personnelDiv.innerHTML = `<div class="empty-state"><i class="fa-solid fa-users-slash"></i><p>Aucun employé enregistré.</p></div>`;
-    salDiv.innerHTML = `<div class="empty-state"><p>Aucun contrat.</p></div>`;
+    personnelDiv.innerHTML = `<div class="empty-state"><i class="fa-solid fa-users-slash"></i><p>Aucun employé.</p></div>`;
   } else {
     personnel.forEach((p) => {
       const isMe = p.id === currentUser.id;
       let actionHtml = "";
-
       if (p.is_approved) {
         actionHtml = `<button class="btn-action btn-fire" onclick="event.stopPropagation(); virerUtilisateur('${p.id}', '${p.full_name}')" ${isMe ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : ""}><i class="fa-solid fa-trash"></i></button>`;
       } else {
         actionHtml = `<button class="btn-action btn-validate" onclick="event.stopPropagation(); validerUtilisateur('${p.id}')"><i class="fa-solid fa-check"></i></button>
                               <button class="btn-action btn-fire" onclick="event.stopPropagation(); virerUtilisateur('${p.id}', '${p.full_name}')"><i class="fa-solid fa-trash"></i></button>`;
       }
-
       if (p.is_approved && p.role === "employe" && !isMe) {
         actionHtml =
-          `<button class="btn-action btn-contremaitre" onclick="event.stopPropagation(); changerRole('${p.id}', 'contremaitre')" title="Nommer Contremaître"><i class="fa-solid fa-hard-hat"></i></button>` +
+          `<button class="btn-action btn-contremaitre" onclick="event.stopPropagation(); changerRole('${p.id}', 'contremaitre')" title="Contremaître"><i class="fa-solid fa-hard-hat"></i></button>` +
           actionHtml;
       }
       if (p.is_approved && p.role === "contremaitre" && !isMe) {
         actionHtml =
-          `<button class="btn-action btn-secondary" onclick="event.stopPropagation(); changerRole('${p.id}', 'employe')" title="Rétrograder Employé"><i class="fa-solid fa-arrow-down"></i></button>` +
+          `<button class="btn-action btn-secondary" onclick="event.stopPropagation(); changerRole('${p.id}', 'employe')" title="Employé"><i class="fa-solid fa-arrow-down"></i></button>` +
           actionHtml;
       }
       if (p.role === "employe" && p.is_approved && !isMe) {
         actionHtml =
-          `<button class="btn-action btn-promote" onclick="event.stopPropagation(); changerRole('${p.id}', 'patron')" title="Promouvoir Patron"><i class="fa-solid fa-crown"></i></button>` +
+          `<button class="btn-action btn-promote" onclick="event.stopPropagation(); changerRole('${p.id}', 'patron')" title="Patron"><i class="fa-solid fa-crown"></i></button>` +
           actionHtml;
       }
-
-      let roleBadge = "Employé";
-      let badgeColor = "var(--text-muted)";
+      let roleBadge = "Employé",
+        badgeColor = "var(--text-muted)";
       if (p.role === "patron") {
         roleBadge = "Patron";
         badgeColor = "var(--primary)";
@@ -562,7 +605,6 @@ async function loadPatronData() {
         roleBadge = "Contremaître";
         badgeColor = "#3498db";
       }
-
       const statusBadge = p.is_approved
         ? ""
         : '<span style="color:var(--danger); font-weight:bold;">(En attente)</span>';
@@ -572,7 +614,6 @@ async function loadPatronData() {
                     <div class="personnel-info"><strong>${p.full_name} ${isMe ? "(Vous)" : ""}</strong><span>Rôle : <span style="color:${badgeColor}; font-weight:bold;">${roleBadge}</span> ${statusBadge}</span></div>
                     <div class="personnel-actions">${actionHtml}</div>
                 </div>`;
-
       if (p.is_approved) {
         salDiv.innerHTML += `
                     <div class="salary-row">
@@ -602,16 +643,14 @@ async function loadPatronData() {
 
     filtered.forEach((t) => {
       const cost = t.quantity * t.unit_price;
-
       if (t.type === "achat") totalAchats += cost;
       else if (t.type === "salaire") totalSalairesPayes += cost;
       else if (t.type === "vente") totalVentes += cost;
 
       const color = typeColors[t.item_type] || "#888";
       const textColor = t.item_type === "Charbon Normale" ? "#333" : "#fff";
-
-      let badgeClass = "bg-secondary";
-      let textClass = "text-muted";
+      let badgeClass = "bg-secondary",
+        textClass = "text-muted";
 
       if (t.type === "vente") {
         badgeClass = "bg-green";
@@ -663,7 +702,7 @@ async function loadPatronData() {
 }
 
 // ==========================================
-// --- GRAPHIQUES (CORRIGÉS) ---
+// --- HISTORIQUE & GRAPHIQUES ---
 // ==========================================
 function renderCharts(transactions) {
   let achats = {
@@ -672,6 +711,7 @@ function renderCharts(transactions) {
     "Charbon Normale": 0,
     "Briquettes de Charbon": 0,
     "Coke de charbon": 0,
+    Divers: 0,
   };
   let ventes = {
     "Petit bois": 0,
@@ -685,22 +725,22 @@ function renderCharts(transactions) {
 
   transactions.forEach((t) => {
     const cost = t.quantity * t.unit_price;
-    if (t.type === "achat" && achats[t.item_type] !== undefined)
-      achats[t.item_type] += cost;
+    if (t.type === "achat") {
+      if (achats[t.item_type] !== undefined) achats[t.item_type] += cost;
+      else achats["Divers"] += cost;
+    }
     if (t.type === "vente" && ventes[t.item_type] !== undefined)
       ventes[t.item_type] += cost;
   });
 
   const labelsAchats = Object.keys(achats).filter((k) => achats[k] > 0);
   const dataAchats = labelsAchats.map((k) => achats[k]);
-
   const labelsVentes = Object.keys(ventes).filter((k) => ventes[k] > 0);
   const dataVentes = labelsVentes.map((k) => ventes[k]);
 
   if (chartAchatsInstance) chartAchatsInstance.destroy();
   if (chartVentesInstance) chartVentesInstance.destroy();
 
-  // Options communes : Légende en bas pour centrer le cercle
   const commonOptions = {
     responsive: true,
     maintainAspectRatio: false,
@@ -719,9 +759,7 @@ function renderCharts(transactions) {
     },
   };
 
-  // --- GRAPHIQUE ACHATS ---
   const ctxA = document.getElementById("chart-achats").getContext("2d");
-
   if (labelsAchats.length === 0) {
     chartAchatsInstance = new Chart(ctxA, {
       type: "doughnut",
@@ -747,7 +785,7 @@ function renderCharts(transactions) {
           {
             data: dataAchats,
             backgroundColor: labelsAchats.map((l) => typeColors[l] || "#888"),
-            borderWidth: 0, // <-- SUPPRIME LA LIGNE BLANCHE
+            borderWidth: 0,
             cutout: "60%",
           },
         ],
@@ -756,9 +794,7 @@ function renderCharts(transactions) {
     });
   }
 
-  // --- GRAPHIQUE VENTES ---
   const ctxV = document.getElementById("chart-ventes").getContext("2d");
-
   if (labelsVentes.length === 0) {
     chartVentesInstance = new Chart(ctxV, {
       type: "doughnut",
@@ -784,7 +820,7 @@ function renderCharts(transactions) {
           {
             data: dataVentes,
             backgroundColor: labelsVentes.map((l) => typeColors[l] || "#888"),
-            borderWidth: 0, // <-- SUPPRIME LA LIGNE BLANCHE
+            borderWidth: 0,
             cutout: "60%",
           },
         ],
@@ -794,9 +830,6 @@ function renderCharts(transactions) {
   }
 }
 
-// ==========================================
-// --- HISTORIQUE INDIVIDUEL ---
-// ==========================================
 async function showUserHistory(userId, userName) {
   document.getElementById("user-history-title").innerText =
     `Historique de ${userName}`;
@@ -825,16 +858,10 @@ async function showUserHistory(userId, userName) {
             : "bg-red";
       if (t.type === "ajustement") badgeClass = "bg-blue";
 
-      tbody.innerHTML += `
-                <tr>
-                    <td>${new Date(t.created_at).toLocaleDateString()}</td>
-                    <td><span class="badge-type ${badgeClass}">${t.type.toUpperCase()}</span></td>
-                    <td><span class="badge-type" style="background-color: ${color}; color: ${textColor};">${t.item_type}</span></td>
-                    <td class="${t.type === "vente" ? "text-success" : "text-danger"}">${Math.floor(cost)} Septims</td>
-                </tr>`;
+      tbody.innerHTML += `<tr><td>${new Date(t.created_at).toLocaleDateString()}</td><td><span class="badge-type ${badgeClass}">${t.type.toUpperCase()}</span></td><td><span class="badge-type" style="background-color: ${color}; color: ${textColor};">${t.item_type}</span></td><td class="${t.type === "vente" ? "text-success" : "text-danger"}">${Math.floor(cost)} Septims</td></tr>`;
     });
   } else {
-    tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state"><i class="fa-solid fa-receipt"></i><p>Aucune transaction pour cet employé.</p></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state"><i class="fa-solid fa-receipt"></i><p>Aucune transaction.</p></div></td></tr>`;
   }
 }
 function closeUserHistory() {
@@ -850,9 +877,6 @@ function updateSalaryTotal() {
   if (display) display.innerText = Math.floor(total) + " S";
 }
 
-// ==========================================
-// --- ACTIONS PATRON ---
-// ==========================================
 async function validerUtilisateur(id) {
   const { error } = await db
     .from("profiles")
@@ -864,7 +888,6 @@ async function validerUtilisateur(id) {
     loadPatronData();
   }
 }
-
 async function changerRole(id, nouveauRole) {
   const roleNom =
     nouveauRole === "patron"
@@ -880,7 +903,7 @@ async function changerRole(id, nouveauRole) {
         .from("profiles")
         .update({ role: nouveauRole })
         .eq("id", id);
-      if (error) showPopup("Erreur", "Impossible de changer le rôle.");
+      if (error) showPopup("Erreur", "Impossible.");
       else {
         showPopup("Succès", `Le joueur est maintenant ${roleNom}.`);
         loadPatronData();
@@ -888,7 +911,6 @@ async function changerRole(id, nouveauRole) {
     },
   );
 }
-
 async function virerUtilisateur(id, nom) {
   showConfirm("Virer", `VIRER ${nom} ?`, async () => {
     const { error } = await db.rpc("supprimer_utilisateur", {
@@ -901,7 +923,6 @@ async function virerUtilisateur(id, nom) {
     }
   });
 }
-
 async function deleteTransaction(id) {
   showConfirm("Supprimer", "Supprimer cette transaction ?", async () => {
     await db.from("transactions").delete().eq("id", id);
@@ -914,22 +935,17 @@ async function deleteTransaction(id) {
 async function paySalaries() {
   const inputs = document.querySelectorAll('[id^="sal-amount-"]');
   if (inputs.length === 0) return showPopup("Info", "Aucun employé à payer.");
-
-  let totalPaye = 0;
-  let transactionsToInsert = [];
-  let updates = [];
+  let totalPaye = 0,
+    transactionsToInsert = [],
+    updates = [];
 
   for (const input of inputs) {
     const id = input.id.replace("sal-amount-", "");
     const salary = parseInt(input.value) || 0;
-
     if (salary > 0) {
-      const row = input.closest(".salary-row");
-      const nom = row.querySelector("span").innerText;
-
+      const nom = input.closest(".salary-row").querySelector("span").innerText;
       totalPaye += salary;
       updates.push({ id: id, salary: salary });
-
       transactionsToInsert.push({
         type: "salaire",
         item_type: "Salaire",
@@ -940,33 +956,24 @@ async function paySalaries() {
       });
     }
   }
-
-  if (totalPaye === 0) {
+  if (totalPaye === 0)
     return showPopup("Info", "Le total des salaires est de 0.");
-  }
 
   showConfirm(
     "Payer l'équipe",
     `Confirmer le paiement de ${totalPaye} Septims ?`,
     async () => {
-      for (const update of updates) {
+      for (const update of updates)
         await db
           .from("profiles")
           .update({ salary: update.salary })
           .eq("id", update.id);
-      }
-
       const { error } = await db
         .from("transactions")
         .insert(transactionsToInsert);
-
-      if (error) {
-        showPopup("Erreur", "Erreur lors du paiement : " + error.message);
-      } else {
-        showPopup(
-          "Salaires Payés",
-          `${totalPaye} Septims ont été distribués à l'équipe.`,
-        );
+      if (error) showPopup("Erreur", error.message);
+      else {
+        showPopup("Salaires Payés", `${totalPaye} Septims distribués.`);
         loadPatronData();
         loadEmployeData();
         loadTreasury();
@@ -976,12 +983,11 @@ async function paySalaries() {
 }
 
 // ==========================================
-// --- TONNEAUX, FOURS, COMMANDES, STOCK (LOGIQUE) ---
+// --- TONNEAUX (PRIX PAR TONNEAU) ---
 // ==========================================
 async function loadBarrels() {
   const { data: rentals } = await db.from("barrel_rentals").select("*");
   const container = document.querySelector("#tab-location .barrels-grid");
-
   if (!container) return;
 
   if (container.innerHTML.trim() === "") {
@@ -1000,7 +1006,6 @@ async function loadBarrels() {
     const card = document.getElementById(`barrel-${i}`);
     if (!card) continue;
     const rental = rentals ? rentals.find((r) => r.barrel_number === i) : null;
-
     card.className = "barrel-card free";
     const statusEl = card.querySelector(".status-badge");
     const clientEl = card.querySelector(".client-name");
@@ -1009,31 +1014,52 @@ async function loadBarrels() {
 
     if (rental) {
       clientEl.innerHTML = `<i class="fa-solid fa-user"></i> ${rental.client_name}`;
+
+      let priceHtml = `
+                <div class="barrel-price-container">
+                    <span style="color: var(--text-muted); font-size: 0.9em;">Prix :</span> 
+                    <div style="display:flex; align-items:center; gap:5px;">
+                        <span style="color: var(--primary); font-weight: bold; font-family: 'Cinzel';">${rental.price || 50}</span>
+                        <span style="color: var(--primary); font-weight: bold;">S</span>
+                    </div>
+                </div>`;
+
+      if (userProfile.role === "patron") {
+        priceHtml = `
+                <div class="barrel-price-container" onclick="this.querySelector('input').focus()">
+                    <span style="color: var(--text-muted); font-size: 0.9em;">Prix :</span> 
+                    <div style="display:flex; align-items:center; gap:5px;">
+                        <input type="number" class="barrel-price-input" value="${rental.price || 50}" onchange="updateBarrelPrice(${rental.id}, this.value)">
+                        <span style="color: var(--primary); font-weight: bold;">S</span>
+                        <i class="fa-solid fa-pen" style="color: var(--text-muted); font-size: 0.8em; margin-left: 5px;"></i>
+                    </div>
+                </div>`;
+      }
+
       if (rental.last_payment_date) {
         const lastPay = new Date(rental.last_payment_date);
         const nextPay = new Date(lastPay);
         nextPay.setDate(nextPay.getDate() + 7);
-        const now = new Date();
         const diffDays = Math.ceil(
-          (nextPay.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
+          (nextPay.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24),
         );
         const options = { day: "2-digit", month: "2-digit", year: "numeric" };
-
         if (diffDays < 0) {
           card.classList.add("late");
           statusEl.innerText = "En retard";
-          payInfoEl.innerHTML = `<span>Dernier : ${lastPay.toLocaleDateString("fr-FR", options)}</span><span class="next-pay-date">Dû le : ${nextPay.toLocaleDateString("fr-FR", options)}</span><span style="color: var(--danger); font-weight: bold;">Retard de ${Math.abs(diffDays)}j</span>`;
+          payInfoEl.innerHTML = `${priceHtml}<span>Dernier : ${lastPay.toLocaleDateString("fr-FR", options)}</span><span class="next-pay-date">Dû le : ${nextPay.toLocaleDateString("fr-FR", options)}</span><span style="color: var(--danger); font-weight: bold;">Retard de ${Math.abs(diffDays)}j</span>`;
         } else {
           card.classList.add("paid");
           statusEl.innerText = "À jour";
-          payInfoEl.innerHTML = `<span>Dernier : ${lastPay.toLocaleDateString("fr-FR", options)}</span><span class="next-pay-date">Prochain : <strong>${nextPay.toLocaleDateString("fr-FR", options)}</strong></span><span>Dans ${diffDays}j</span>`;
+          payInfoEl.innerHTML = `${priceHtml}<span>Dernier : ${lastPay.toLocaleDateString("fr-FR", options)}</span><span class="next-pay-date">Prochain : <strong>${nextPay.toLocaleDateString("fr-FR", options)}</strong></span><span>Dans ${diffDays}j</span>`;
         }
       } else {
         card.classList.add("late");
         statusEl.innerText = "Jamais payé";
-        payInfoEl.innerHTML = `<span style="color: var(--danger);">Aucun paiement</span>`;
+        payInfoEl.innerHTML = `${priceHtml}<span style="color: var(--danger);">Aucun paiement</span>`;
       }
-      actionsEl.innerHTML = `<button class="btn-pay" onclick="payBarrel(${rental.id}, ${i}, '${rental.client_name}')"><i class="fa-solid fa-coins"></i> Encaisser 50</button><button class="btn-free" onclick="freeBarrel(${rental.id})"><i class="fa-solid fa-trash"></i> Libérer</button>`;
+
+      actionsEl.innerHTML = `<button class="btn-pay" onclick="payBarrel(${rental.id}, ${i}, '${rental.client_name}')"><i class="fa-solid fa-coins"></i> Encaisser</button><button class="btn-free" onclick="freeBarrel(${rental.id})"><i class="fa-solid fa-trash"></i> Libérer</button>`;
     } else {
       clientEl.innerHTML = "";
       payInfoEl.innerHTML = "";
@@ -1048,6 +1074,7 @@ function allocateBarrel(num) {
   document.getElementById("allocate-barrel-title").innerText =
     `Tonneau n°${num}`;
   document.getElementById("allocate-client-name").value = "";
+  document.getElementById("allocate-price").value = 50;
   document.getElementById("allocate-barrel-modal").style.display = "flex";
   setTimeout(
     () => document.getElementById("allocate-client-name").focus(),
@@ -1063,6 +1090,8 @@ async function confirmAllocateBarrel() {
   const clientName = document
     .getElementById("allocate-client-name")
     .value.trim();
+  const price =
+    parseFloat(document.getElementById("allocate-price").value) || 50;
   if (!clientName)
     return showPopup("Erreur", "Veuillez entrer un nom de client.");
   if (!currentBarrelToAllocate) return;
@@ -1071,6 +1100,7 @@ async function confirmAllocateBarrel() {
     .insert({
       barrel_number: currentBarrelToAllocate,
       client_name: clientName,
+      price: price,
     });
   if (error) showPopup("Erreur", error.message);
   else {
@@ -1080,27 +1110,64 @@ async function confirmAllocateBarrel() {
   }
 }
 
+async function updateBarrelPrice(id, newPrice) {
+  const price = parseFloat(newPrice);
+  if (isNaN(price) || price < 0) return loadBarrels();
+  const { error } = await db
+    .from("barrel_rentals")
+    .update({ price: price })
+    .eq("id", id);
+  if (error) showPopup("Erreur", "Impossible de modifier le prix.");
+  else loadBarrels();
+}
+
+// LA CORRECTION EST ICI : On lit la valeur de l'input directement au moment du clic
 async function payBarrel(id, num, clientName) {
+  let finalPrice = 50; // Valeur par défaut
+
+  // On cherche la carte du tonneau pour récupérer la valeur exacte tapée dans l'input
+  const card = document.getElementById(`barrel-${num}`);
+  if (card) {
+    const priceInput = card.querySelector('input[type="number"]');
+    if (priceInput) {
+      finalPrice = parseFloat(priceInput.value) || 50;
+      // On sauvegarde le prix immédiatement au cas où l'utilisateur n'aurait pas cliqué ailleurs
+      await db
+        .from("barrel_rentals")
+        .update({ price: finalPrice })
+        .eq("id", id);
+    } else {
+      // Si pas d'input (c'est un employé), on va chercher le prix en base de données
+      const { data } = await db
+        .from("barrel_rentals")
+        .select("price")
+        .eq("id", id)
+        .single();
+      if (data && data.price) finalPrice = data.price;
+    }
+  }
+
   showConfirm(
     "Encaisser",
-    `Encaisser 50 Septims pour le tonneau n°${num} ?`,
+    `Encaisser ${finalPrice} Septims pour le tonneau n°${num} (${clientName}) ?`,
     async () => {
       const { error: errRental } = await db
         .from("barrel_rentals")
         .update({ last_payment_date: new Date().toISOString() })
         .eq("id", id);
-      if (errRental) return showPopup("Erreur", "Erreur.");
-      await db
-        .from("transactions")
-        .insert({
-          type: "vente",
-          item_type: "Location tonneau",
-          counterparty_name: clientName,
-          quantity: 1,
-          unit_price: 50,
-          created_by: currentUser.id,
-        });
-      showPopup("Payé", `50 Septims encaissés.`);
+      if (errRental)
+        return showPopup("Erreur", "Erreur lors de l'encaissement.");
+
+      await db.from("transactions").insert({
+        type: "vente",
+        item_type: "Location tonneau",
+        counterparty_name: clientName,
+        quantity: 1,
+        unit_price: finalPrice,
+        created_by: currentUser.id,
+      });
+
+      showPopup("Payé", `${finalPrice} Septims encaissés.`);
       loadBarrels();
       if (userProfile.role === "patron") {
         loadPatronData();
@@ -1121,31 +1188,31 @@ async function freeBarrel(id) {
   );
 }
 
+// ==========================================
+// --- FOURS ---
+// ==========================================
 async function loadFurnaces() {
   const { data: furnaces } = await db
     .from("furnace_rentals")
     .select("*")
     .order("created_at", { ascending: true });
   const container = document.getElementById("furnaces-container");
-
+  if (!container) return;
   if (furnaces && furnaces.length > 0) {
     container.innerHTML = "";
     furnaces.forEach((f) => {
-      let cardClass = "free";
-      let statusText = "Libre";
-      let payInfo = "";
-      let actionsHtml = "";
-
+      let cardClass = "free",
+        statusText = "Libre",
+        payInfo = "",
+        actionsHtml = "";
       if (f.last_payment_date) {
         const lastPay = new Date(f.last_payment_date);
         const nextPay = new Date(lastPay);
         nextPay.setDate(nextPay.getDate() + 7);
-        const now = new Date();
         const diffDays = Math.ceil(
-          (nextPay.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
+          (nextPay.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24),
         );
         const options = { day: "2-digit", month: "2-digit", year: "numeric" };
-
         if (diffDays < 0) {
           cardClass = "late";
           statusText = "En retard";
@@ -1160,29 +1227,18 @@ async function loadFurnaces() {
         statusText = "Jamais payé";
         payInfo = `<span style="color: var(--danger);">Aucun paiement</span>`;
       }
-
       actionsHtml = `<button class="btn-pay" onclick="payFurnace(${f.id}, '${f.client_name}')"><i class="fa-solid fa-coins"></i> Encaisser 30</button>`;
-      if (userProfile.role === "patron") {
+      if (userProfile.role === "patron")
         actionsHtml += `<button class="btn-free" onclick="freeFurnace(${f.id})"><i class="fa-solid fa-trash"></i> Libérer</button>`;
-      }
-
       container.innerHTML += `
                 <div class="barrel-card ${cardClass}">
                     <div class="barrel-header"><h3>Four</h3><span class="status-badge">${statusText}</span></div>
-                    <div class="barrel-body">
-                        <div class="client-name"><i class="fa-solid fa-user"></i> ${f.client_name}</div>
-                        <div class="pay-info">${payInfo}</div>
-                    </div>
+                    <div class="barrel-body"><div class="client-name"><i class="fa-solid fa-user"></i> ${f.client_name}</div><div class="pay-info">${payInfo}</div></div>
                     <div class="barrel-actions">${actionsHtml}</div>
-                </div>
-            `;
+                </div>`;
     });
   } else {
-    container.innerHTML = `
-            <div class="empty-state">
-                <i class="fa-solid fa-fire"></i>
-                <p>Aucun client n'utilise le four actuellement.</p>
-            </div>`;
+    container.innerHTML = `<div class="empty-state"><i class="fa-solid fa-fire"></i><p>Aucun client.</p></div>`;
   }
 }
 
@@ -1199,15 +1255,13 @@ async function confirmCreateFurnace() {
   const clientName = document
     .getElementById("furnace-client-name")
     .value.trim();
-  if (!clientName)
-    return showPopup("Erreur", "Veuillez entrer un nom de client.");
-
+  if (!clientName) return showPopup("Erreur", "Veuillez entrer un nom.");
   const { error } = await db
     .from("furnace_rentals")
     .insert({ client_name: clientName, created_by: currentUser.id });
   if (error) showPopup("Erreur", error.message);
   else {
-    showPopup("Succès", `Client ${clientName} ajouté pour le four.`);
+    showPopup("Succès", `Client ajouté.`);
     closeFurnaceModal();
     loadFurnaces();
   }
@@ -1223,17 +1277,17 @@ async function payFurnace(id, clientName) {
         .update({ last_payment_date: new Date().toISOString() })
         .eq("id", id);
       if (errFurnace) return showPopup("Erreur", "Impossible.");
-
-      await db.from("transactions").insert({
-        type: "vente",
-        item_type: "Location four",
-        counterparty_name: clientName,
-        quantity: 1,
-        unit_price: 30,
-        created_by: currentUser.id,
-      });
-
-      showPopup("Payé", `30 Septims encaissés. Prochain paiement dans 7j.`);
+      await db
+        .from("transactions")
+        .insert({
+          type: "vente",
+          item_type: "Location four",
+          counterparty_name: clientName,
+          quantity: 1,
+          unit_price: 30,
+          created_by: currentUser.id,
+        });
+      showPopup("Payé", `30 Septims encaissés.`);
       loadFurnaces();
       if (userProfile.role === "patron") {
         loadPatronData();
@@ -1247,7 +1301,7 @@ async function payFurnace(id, clientName) {
 async function freeFurnace(id) {
   showConfirm(
     "Libérer",
-    "Voulez-vous vraiment supprimer ce client du four ?",
+    "Voulez-vous vraiment supprimer ce client ?",
     async () => {
       await db.from("furnace_rentals").delete().eq("id", id);
       loadFurnaces();
@@ -1255,6 +1309,9 @@ async function freeFurnace(id) {
   );
 }
 
+// ==========================================
+// --- COMMANDES ---
+// ==========================================
 async function createOrder(e) {
   e.preventDefault();
   const client_name = document.getElementById("ord-client").value.trim();
@@ -1263,8 +1320,7 @@ async function createOrder(e) {
   const unit_price = Math.floor(
     parseFloat(document.getElementById("ord-price").value),
   );
-  const deadlineInput = document.getElementById("ord-deadline").value;
-  const deadline = deadlineInput ? deadlineInput : null;
+  const deadline = document.getElementById("ord-deadline").value || null;
 
   const { error } = await db
     .from("orders")
@@ -1290,7 +1346,7 @@ async function loadOrders() {
     .select("*")
     .order("created_at", { ascending: true });
   const container = document.getElementById("orders-container");
-
+  if (!container) return;
   if (orders && orders.length > 0) {
     container.innerHTML = "";
     orders.forEach((o) => {
@@ -1311,11 +1367,7 @@ async function loadOrders() {
                 </div>`;
     });
   } else {
-    container.innerHTML = `
-            <div class="empty-state">
-                <i class="fa-solid fa-clipboard-list"></i>
-                <p>Aucune commande en attente pour le moment.</p>
-            </div>`;
+    container.innerHTML = `<div class="empty-state"><i class="fa-solid fa-clipboard-list"></i><p>Aucune commande.</p></div>`;
   }
 }
 
@@ -1360,13 +1412,14 @@ async function cancelOrder(id) {
 }
 
 async function loadEmployeData() {
+  if (!currentUser) return;
   const { data } = await db
     .from("transactions")
     .select("*")
     .eq("created_by", currentUser.id)
     .order("created_at", { ascending: false });
   const tbody = document.getElementById("emp-history-body");
-
+  if (!tbody) return;
   if (data && data.length > 0) {
     tbody.innerHTML = "";
     data.forEach((t) => {
@@ -1380,17 +1433,14 @@ async function loadEmployeData() {
             ? "bg-purple"
             : "bg-red";
       if (t.type === "ajustement") badgeClass = "bg-blue";
-
       tbody.innerHTML += `<tr><td>${new Date(t.created_at).toLocaleDateString()}</td><td><span class="badge-type ${badgeClass}">${t.type.toUpperCase()}</span></td><td><span class="badge-type" style="background-color: ${color}; color: ${textColor};">${t.item_type}</span></td><td class="${t.type === "vente" ? "text-success" : "text-danger"}">${cost} Septims</td></tr>`;
     });
   } else {
-    tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state"><i class="fa-solid fa-receipt"></i><p>Vous n'avez encore effectué aucune opération.</p></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state"><i class="fa-solid fa-receipt"></i><p>Aucune opération.</p></div></td></tr>`;
   }
 }
 
-// ==========================================
 // --- DÉMARRAGE ---
-// ==========================================
 db.auth.getSession().then(({ data: { session } }) => {
   if (session) {
     currentUser = session.user;

@@ -236,7 +236,6 @@
             <section id="tab-stock" class="tab-content">
               <h2 class="page-title">État du Stock</h2>
 
-              <!-- TRÉSORERIE -->
               <div
                 id="treasury-card"
                 class="card"
@@ -245,7 +244,6 @@
                 <h3 style="color: var(--primary)">
                   <i class="fa-solid fa-coins"></i> Trésorerie de la Scierie
                 </h3>
-
                 <div
                   style="
                     display: flex;
@@ -297,7 +295,6 @@
                         "
                         onchange="updateTreasuryDirect(this)"
                       />
-
                       <span
                         style="
                           font-size: 1.2em;
@@ -317,7 +314,6 @@
                       ></i>
                     </div>
                   </div>
-
                   <div style="display: flex; gap: 10px; align-items: flex-end">
                     <div class="input-group" style="margin-bottom: 0">
                       <label>Montant</label>
@@ -367,12 +363,10 @@
             <!-- ONGLET SAISIE DIRECTE -->
             <section id="tab-saisie" class="tab-content">
               <h2 class="page-title">Enregistrer une opération</h2>
-
               <div
                 class="grid-layout-equal"
                 style="grid-template-columns: 350px 1fr"
               >
-                <!-- Colonne de gauche : Le formulaire compact -->
                 <div class="card" style="height: fit-content">
                   <h3><i class="fa-solid fa-pen-nib"></i> Formulaire</h3>
                   <form id="employe-form" onsubmit="addTransaction(event)">
@@ -400,7 +394,24 @@
                           <option value="Coke de charbon">
                             Coke de charbon
                           </option>
+                          <option value="Divers">
+                            Divers (Achat uniquement)
+                          </option>
                         </select>
+                      </div>
+                    </div>
+                    <div
+                      class="form-row"
+                      id="custom-item-row"
+                      style="display: none"
+                    >
+                      <div class="input-group">
+                        <label>Précisez l'achat</label>
+                        <input
+                          type="text"
+                          id="emp-custom-item"
+                          placeholder="Ex: Fer, Outils..."
+                        />
                       </div>
                     </div>
                     <div class="form-row">
@@ -443,26 +454,22 @@
                   </form>
                 </div>
 
-                <!-- Colonne de droite : Le tableau des prix -->
                 <div class="card" style="max-height: 650px; overflow-y: auto">
                   <h3>
                     <i class="fa-solid fa-scroll"></i> Tableau des Prix
                     Officiels
                   </h3>
-
-                  <!-- SECTION VENTES -->
                   <div class="price-section">
                     <h4
                       class="section-title text-success"
                       style="border-color: var(--success)"
                     >
-                      VENTES (Ce que la scierie gagne)
+                      VENTES
                     </h4>
-
                     <table class="data-table price-table">
                       <thead>
                         <tr>
-                          <th>Type de Charbon</th>
+                          <th>Type</th>
                           <th>Prix Standard</th>
                           <th>Prix Forgeron 🔨</th>
                         </tr>
@@ -500,16 +507,13 @@
                       <i class="fa-solid fa-tree"></i> Vente du Bois : 0.2 $/u
                     </div>
                   </div>
-
-                  <!-- SECTION RACHATS -->
                   <div class="price-section mt-15">
                     <h4
                       class="section-title text-danger"
                       style="border-color: var(--danger)"
                     >
-                      RACHATS (Ce que la scierie dépense)
+                      RACHATS
                     </h4>
-
                     <table class="data-table price-table">
                       <thead>
                         <tr>
@@ -556,7 +560,6 @@
                       <i class="fa-solid fa-tree"></i> Rachat du Bois : 0.15 $/u
                     </div>
                   </div>
-
                   <div
                     style="
                       margin-top: 20px;
@@ -584,7 +587,9 @@
                   font-size: 0.95em;
                 "
               >
-                Tarif : <strong>50 Septims / semaine</strong>.
+                Tarif par défaut :
+                <strong>50 Septims / semaine</strong> (modifiable par le
+                patron).
               </p>
               <div class="barrels-grid"></div>
             </section>
@@ -723,7 +728,6 @@
                       style="max-height: 400px; overflow-y: auto"
                     ></div>
                   </div>
-
                   <div class="card">
                     <h3>
                       <i class="fa-solid fa-money-bill-wave"></i> Contrats de
@@ -733,7 +737,6 @@
                       id="admin-salaries-list"
                       style="margin-bottom: 15px"
                     ></div>
-
                     <div class="salary-total-box">
                       <span>Total à payer :</span>
                       <span
@@ -747,7 +750,6 @@
                         >0 S</span
                       >
                     </div>
-
                     <button
                       class="btn-primary btn-pay-salary"
                       onclick="paySalaries()"
@@ -757,7 +759,6 @@
                     </button>
                   </div>
                 </div>
-
                 <div class="col-right">
                   <div class="card">
                     <h3>
@@ -796,6 +797,8 @@
         <button class="btn-primary" onclick="closePopup()">Compris</button>
       </div>
     </div>
+
+    <!-- MODALE ALLOUER TONNEAU (Avec champ prix) -->
     <div id="allocate-barrel-modal" class="modal-overlay">
       <div class="modal-box">
         <h3>Allouer un Tonneau</h3>
@@ -811,11 +814,20 @@
         >
           Tonneau n°1
         </p>
-        <div class="input-group" style="margin-bottom: 20px">
+        <div class="input-group" style="margin-bottom: 15px">
           <input
             type="text"
             id="allocate-client-name"
             placeholder="Nom du client"
+            style="text-align: center; font-size: 1.1em; padding: 15px"
+          />
+        </div>
+        <div class="input-group" style="margin-bottom: 20px">
+          <label style="text-align: center">Prix hebdomadaire (S)</label>
+          <input
+            type="number"
+            id="allocate-price"
+            value="50"
             style="text-align: center; font-size: 1.1em; padding: 15px"
           />
         </div>
@@ -825,8 +837,9 @@
             onclick="closeAllocateModal()"
             style="flex: 1"
           >
-            Annuler</button
-          ><button
+            Annuler
+          </button>
+          <button
             class="btn-primary"
             onclick="confirmAllocateBarrel()"
             style="flex: 1"
@@ -836,6 +849,7 @@
         </div>
       </div>
     </div>
+
     <div id="create-furnace-modal" class="modal-overlay">
       <div class="modal-box">
         <h3>Nouveau Client (Four)</h3>
