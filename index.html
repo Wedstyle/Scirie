@@ -17,19 +17,20 @@
       <div class="auth-box">
         <h1><i class="fa-solid fa-tree"></i> Scierie d'Anga</h1>
         <p class="subtitle">Système de Gestion RP</p>
+
         <div id="login-form">
           <h2>Pointage</h2>
           <div class="input-group">
-            <i class="fa-solid fa-user"></i
-            ><input
+            <i class="fa-solid fa-user"></i>
+            <input
               type="text"
               id="login-pseudo"
               placeholder="Nom et Prénom (RP)"
             />
           </div>
           <div class="input-group">
-            <i class="fa-solid fa-lock"></i
-            ><input
+            <i class="fa-solid fa-lock"></i>
+            <input
               type="password"
               id="login-password"
               placeholder="Code d'accès"
@@ -43,19 +44,20 @@
             <a href="#" onclick="toggleAuth('register')">Demande d'embauche</a>
           </p>
         </div>
+
         <div id="register-form" style="display: none">
           <h2>Demande d'Embauche</h2>
           <div class="input-group">
-            <i class="fa-solid fa-user-plus"></i
-            ><input
+            <i class="fa-solid fa-user-plus"></i>
+            <input
               type="text"
               id="reg-pseudo"
               placeholder="Nom et Prénom (RP)"
             />
           </div>
           <div class="input-group">
-            <i class="fa-solid fa-key"></i
-            ><input
+            <i class="fa-solid fa-key"></i>
+            <input
               type="password"
               id="reg-password"
               placeholder="Choisissez un Code d'accès"
@@ -388,7 +390,7 @@
               </div>
             </section>
 
-            <!-- ONGLET LOCATION DE TONNEAUX (23 Tonneaux) -->
+            <!-- ONGLET LOCATION DE TONNEAUX -->
             <section id="tab-location" class="tab-content">
               <h2 class="page-title">Location de Tonneaux</h2>
               <p
@@ -400,9 +402,7 @@
               >
                 Tarif : <strong>50 Septims / semaine</strong>.
               </p>
-              <div class="barrels-grid">
-                <!-- Tonneaux 1 à 22 générés par JS, on ajoute le 23ème ici -->
-              </div>
+              <div class="barrels-grid"></div>
             </section>
 
             <!-- ONGLET LOCATION DE FOUR -->
@@ -544,23 +544,31 @@
                       <i class="fa-solid fa-money-bill-wave"></i> Contrats de
                       Salaires
                     </h3>
-                    <div id="admin-salaries-list"></div>
-                    <div style="display: flex; gap: 10px; margin-top: 15px">
-                      <button
-                        class="btn-secondary"
-                        onclick="saveSalaries()"
-                        style="flex: 1"
+                    <div
+                      id="admin-salaries-list"
+                      style="margin-bottom: 15px"
+                    ></div>
+
+                    <div class="salary-total-box">
+                      <span>Total à payer :</span>
+                      <span
+                        id="salary-total-display"
+                        style="
+                          color: var(--success);
+                          font-size: 1.2em;
+                          font-weight: 700;
+                        "
+                        >0.00 S</span
                       >
-                        <i class="fa-solid fa-floppy-disk"></i> Sauvegarder
-                      </button>
-                      <button
-                        class="btn-primary"
-                        onclick="paySalaries()"
-                        style="flex: 1; background: var(--purple)"
-                      >
-                        <i class="fa-solid fa-hand-holding-dollar"></i> Payer
-                      </button>
                     </div>
+
+                    <button
+                      class="btn-primary btn-pay-salary"
+                      onclick="paySalaries()"
+                    >
+                      <i class="fa-solid fa-hand-holding-dollar"></i> Payer
+                      l'équipe
+                    </button>
                   </div>
                 </div>
 

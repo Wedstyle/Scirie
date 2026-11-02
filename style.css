@@ -818,3 +818,62 @@ header {
 .btn-contremaitre:hover {
   filter: brightness(1.1);
 }
+/* --- SECTION SALAIRES --- */
+.salary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-input);
+  padding: 10px 15px;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  border: 1px solid var(--border);
+}
+
+.salary-row span {
+  font-weight: 500;
+  font-size: 0.95em;
+}
+
+.salary-row input {
+  width: 90px;
+  padding: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-main);
+  border-radius: 4px;
+  text-align: right;
+  font-weight: 600;
+  font-size: 1em;
+  outline: none;
+}
+.salary-row input:focus {
+  border-color: var(--primary);
+}
+
+.salary-total-box {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: 6px;
+  margin-bottom: 15px;
+  font-weight: 600;
+}
+
+.btn-pay-salary {
+  background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+  color: white;
+  padding: 12px;
+  font-size: 1.05em;
+  box-shadow: 0 4px 10px rgba(139, 92, 246, 0.3);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+}
+.btn-pay-salary:hover {
+  background: linear-gradient(135deg, #a78bfa, #7c3aed);
+}

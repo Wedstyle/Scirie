@@ -202,7 +202,7 @@ async function checkUserStatus() {
       document.getElementById("pending-screen").style.display = "flex";
       return;
     }
-    // Le contremaître voit tout SAUF la gestion (tableau de bord)
+    // Le contremaître voit tout SAUF la gestion
     document.getElementById("nav-gestion").style.display = "none";
     document.getElementById("nav-location").style.display = "flex";
     document.getElementById("nav-four").style.display = "flex";
@@ -219,7 +219,7 @@ async function checkUserStatus() {
     }
     // L'employé classique
     document.getElementById("nav-gestion").style.display = "none";
-    document.getElementById("nav-location").style.display = "none"; // Tonneau : Patron/Contremaitre uniquement
+    document.getElementById("nav-location").style.display = "none";
     document.getElementById("nav-four").style.display = "flex";
     document.getElementById("nav-historique").style.display = "flex";
     switchTab("tab-commandes", document.querySelector(".nav-btn"));
@@ -241,7 +241,6 @@ async function loadBarrels() {
 
   if (!container) return;
 
-  // Générer les 23 cartes si elles n'existent pas
   if (!document.getElementById("barrel-1")) {
     container.innerHTML = "";
     for (let i = 1; i <= 23; i++) {
@@ -756,7 +755,6 @@ async function loadPatronData() {
                               <button class="btn-action btn-fire" onclick="event.stopPropagation(); virerUtilisateur('${p.id}', '${p.full_name}')"><i class="fa-solid fa-trash"></i></button>`;
       }
 
-      // Bouton Contremaître (seulement si validé et n'est pas déjà contremaître ou patron)
       if (p.is_approved && p.role === "employe" && !isMe) {
         actionHtml =
           `<button class="btn-action btn-contremaitre" onclick="event.stopPropagation(); changerRole('${p.id}', 'contremaitre')" title="Nommer Contremaître"><i class="fa-solid fa-hard-hat"></i></button>` +
@@ -796,16 +794,18 @@ async function loadPatronData() {
 
       if (p.is_approved) {
         salDiv.innerHTML += `
-                    <div class="salary-row" style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
-                        <span style="flex:1; font-weight:500;">${p.full_name}</span>
-                        <input type="number" value="${p.salary || 0}" id="sal-amount-${p.id}" placeholder="0" style="width:80px;">
-                        <span style="font-size:0.8em; color:var(--text-muted);">S</span>
+                    <div class="salary-row">
+                        <span>${p.full_name}</span>
+                        <input type="number" value="${p.salary || 0}" id="sal-amount-${p.id}" oninput="updateSalaryTotal()" placeholder="0">
                     </div>`;
       }
     });
     if (salDiv.innerHTML === "")
       salDiv.innerHTML = `<div class="empty-state"><p>Aucun employé validé.</p></div>`;
   }
+
+  // Calculer le total au chargement
+  updateSalaryTotal();
 
   const { data: allTransactions } = await db
     .from("transactions")
@@ -865,6 +865,18 @@ async function loadPatronData() {
     document.getElementById("stat-benefice").innerText = "0.00 S";
     renderCharts([]);
   }
+}
+
+// ==========================================
+// --- CALCUL DU TOTAL DES SALAIRES ---
+// ==========================================
+function updateSalaryTotal() {
+  let total = 0;
+  document.querySelectorAll('[id^="sal-amount-"]').forEach((input) => {
+    total += parseFloat(input.value) || 0;
+  });
+  const display = document.getElementById("salary-total-display");
+  if (display) display.innerText = total.toFixed(2) + " S";
 }
 
 // ==========================================
@@ -1046,73 +1058,68 @@ async function deleteTransaction(id) {
 }
 
 // ==========================================
-// --- SALAIRES (SAUVEGARDE ET PAIEMENT) ---
+// --- PAIEMENT DES SALAIRES (FUSIONNÉ) ---
 // ==========================================
-async function saveSalaries() {
+async function paySalaries() {
   const inputs = document.querySelectorAll('[id^="sal-amount-"]');
   if (inputs.length === 0) return showPopup("Info", "Aucun employé à payer.");
 
+  let totalPaye = 0;
+  let transactionsToInsert = [];
   let updates = [];
-  inputs.forEach((input) => {
+
+  for (const input of inputs) {
     const id = input.id.replace("sal-amount-", "");
     const salary = parseFloat(input.value) || 0;
-    updates.push({ id: id, salary: salary });
-  });
 
-  const { error } = await db.from("profiles").upsert(updates);
+    if (salary > 0) {
+      const row = input.closest(".salary-row");
+      const nom = row.querySelector("span").innerText;
 
-  if (error) {
-    console.error(error);
-    showPopup("Erreur", "Impossible de sauvegarder les salaires.");
-  } else {
-    showPopup("Sauvegardé", "Les salaires ont été enregistrés.");
-    loadPatronData();
+      totalPaye += salary;
+      updates.push({ id: id, salary: salary });
+
+      transactionsToInsert.push({
+        type: "salaire",
+        item_type: "Salaire",
+        counterparty_name: nom,
+        quantity: 1,
+        unit_price: salary,
+        created_by: currentUser.id,
+      });
+    }
   }
-}
 
-async function paySalaries() {
-  const { data: personnel } = await db
-    .from("profiles")
-    .select("*")
-    .eq("is_approved", true);
-  const toPay = personnel.filter((p) => p.salary > 0);
-
-  if (toPay.length === 0) {
-    return showPopup(
-      "Info",
-      "Aucun salaire à payer (les montants sont à 0). N'oubliez pas de cliquer sur 'Sauvegarder' avant de payer.",
-    );
+  if (totalPaye === 0) {
+    return showPopup("Info", "Le total des salaires est de 0.");
   }
 
   showConfirm(
-    "Payer les salaires",
-    `Payer un total de ${toPay.reduce((acc, curr) => acc + curr.salary, 0)} Septims ?`,
+    "Payer l'équipe",
+    `Confirmer le paiement de ${totalPaye.toFixed(2)} Septims ?`,
     async () => {
-      let totalPaye = 0;
-      const transactionsToInsert = toPay.map((p) => {
-        totalPaye += p.salary;
-        return {
-          type: "salaire",
-          item_type: "Salaire",
-          counterparty_name: p.full_name,
-          quantity: 1,
-          unit_price: p.salary,
-          created_by: currentUser.id,
-        };
-      });
+      // 1. Mettre à jour les salaires dans les profils (pour la prochaine fois)
+      for (const update of updates) {
+        await db
+          .from("profiles")
+          .update({ salary: update.salary })
+          .eq("id", update.id);
+      }
 
+      // 2. Créer les transactions (dépenses dans la trésorerie)
       const { error } = await db
         .from("transactions")
         .insert(transactionsToInsert);
 
       if (error) {
-        showPopup("Erreur", error.message);
+        showPopup("Erreur", "Erreur lors du paiement : " + error.message);
       } else {
         showPopup(
           "Salaires Payés",
-          `${totalPaye.toFixed(2)} Septims distribués.`,
+          `${totalPaye.toFixed(2)} Septims ont été distribués à l'équipe.`,
         );
-        loadPatronData();
+        loadPatronData(); // Rafraîchit l'interface
+        loadEmployeData();
       }
     },
   );
