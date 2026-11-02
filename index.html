@@ -210,7 +210,7 @@
                         ><input
                           type="number"
                           id="ord-price"
-                          step="1"
+                          step="0.01"
                           value="1"
                           required
                         />
@@ -367,11 +367,14 @@
             <!-- ONGLET SAISIE DIRECTE -->
             <section id="tab-saisie" class="tab-content">
               <h2 class="page-title">Enregistrer une opération</h2>
-              <div class="grid-layout-equal">
-                <div class="card">
-                  <h3>
-                    <i class="fa-solid fa-pen-nib"></i> Formulaire de saisie
-                  </h3>
+
+              <div
+                class="grid-layout-equal"
+                style="grid-template-columns: 350px 1fr"
+              >
+                <!-- Colonne de gauche : Le formulaire compact -->
+                <div class="card" style="height: fit-content">
+                  <h3><i class="fa-solid fa-pen-nib"></i> Formulaire</h3>
                   <form id="employe-form" onsubmit="addTransaction(event)">
                     <div class="form-row">
                       <div class="input-group">
@@ -381,6 +384,8 @@
                           <option value="achat">Achat (Sortie)</option>
                         </select>
                       </div>
+                    </div>
+                    <div class="form-row">
                       <div class="input-group">
                         <label>Marchandise</label>
                         <select id="emp-item" onchange="updateBasePrice()">
@@ -410,15 +415,17 @@
                         />
                       </div>
                       <div class="input-group">
-                        <label>Prix Unitaire (S)</label
+                        <label>Prix U. (S)</label
                         ><input
                           type="number"
                           id="emp-price"
-                          step="1"
+                          step="0.01"
                           value="1"
                           required
                         />
                       </div>
+                    </div>
+                    <div class="form-row mb-15">
                       <div class="input-group">
                         <label>Coût Total</label
                         ><input
@@ -430,89 +437,138 @@
                         />
                       </div>
                     </div>
-                    <button type="submit" class="btn-primary mt-15">
-                      <i class="fa-solid fa-plus"></i> Enregistrer l'opération
+                    <button type="submit" class="btn-primary">
+                      <i class="fa-solid fa-plus"></i> Enregistrer
                     </button>
                   </form>
                 </div>
-                <div class="card">
-                  <h3><i class="fa-solid fa-circle-info"></i> Informations</h3>
-                  <p
-                    style="
-                      font-size: 0.95em;
-                      color: var(--text-muted);
-                      line-height: 1.6;
-                      margin-bottom: 15px;
-                    "
-                  >
-                    Le formulaire ci-contre permet d'enregistrer manuellement
-                    une transaction.
-                  </p>
+
+                <!-- Colonne de droite : Le tableau des prix -->
+                <div class="card" style="max-height: 650px; overflow-y: auto">
+                  <h3>
+                    <i class="fa-solid fa-scroll"></i> Tableau des Prix
+                    Officiels
+                  </h3>
+
+                  <!-- SECTION VENTES -->
+                  <div class="price-section">
+                    <h4
+                      class="section-title text-success"
+                      style="border-color: var(--success)"
+                    >
+                      VENTES (Ce que la scierie gagne)
+                    </h4>
+
+                    <table class="data-table price-table">
+                      <thead>
+                        <tr>
+                          <th>Type de Charbon</th>
+                          <th>Prix Standard</th>
+                          <th>Prix Forgeron 🔨</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td>Pauvre charbon</td>
+                          <td class="text-success">0.7 $/u</td>
+                          <td class="text-success">0.6 $/u</td>
+                        </tr>
+                        <tr>
+                          <td>Charbon</td>
+                          <td class="text-success">1.3 $/u</td>
+                          <td class="text-success">1.2 $/u</td>
+                        </tr>
+                        <tr>
+                          <td>Briquette</td>
+                          <td class="text-success">3 $/u</td>
+                          <td class="text-success">3 $/u</td>
+                        </tr>
+                        <tr>
+                          <td>Coke</td>
+                          <td class="text-success">6 $/u</td>
+                          <td class="text-success">6 $/u</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                    <div
+                      style="
+                        margin-top: 10px;
+                        font-weight: 600;
+                        color: var(--success);
+                      "
+                    >
+                      <i class="fa-solid fa-tree"></i> Vente du Bois : 0.2 $/u
+                    </div>
+                  </div>
+
+                  <!-- SECTION RACHATS -->
+                  <div class="price-section mt-15">
+                    <h4
+                      class="section-title text-danger"
+                      style="border-color: var(--danger)"
+                    >
+                      RACHATS (Ce que la scierie dépense)
+                    </h4>
+
+                    <table class="data-table price-table">
+                      <thead>
+                        <tr>
+                          <th>Type</th>
+                          <th>Indépendants</th>
+                          <th>Fournisseurs</th>
+                          <th>Co-Charbonniers</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td>Pauvre</td>
+                          <td class="text-warning">0.3 $/u</td>
+                          <td class="text-warning">0.4 $/u</td>
+                          <td class="text-warning">0.5 $/u</td>
+                        </tr>
+                        <tr>
+                          <td>Charbon</td>
+                          <td class="text-warning">0.8 $/u</td>
+                          <td class="text-warning">0.9 $/u</td>
+                          <td class="text-warning">1.0 $/u</td>
+                        </tr>
+                        <tr>
+                          <td>Briquette</td>
+                          <td class="text-warning">1.5 $/u</td>
+                          <td class="text-warning">1.5 $/u</td>
+                          <td class="text-warning">2 $/u</td>
+                        </tr>
+                        <tr>
+                          <td>Coke</td>
+                          <td class="text-warning">3 $/u</td>
+                          <td class="text-warning">3 $/u</td>
+                          <td class="text-warning">4 $/u</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                    <div
+                      style="
+                        margin-top: 10px;
+                        font-weight: 600;
+                        color: var(--warning);
+                      "
+                    >
+                      <i class="fa-solid fa-tree"></i> Rachat du Bois : 0.15 $/u
+                    </div>
+                  </div>
+
                   <div
                     style="
-                      background: rgba(0, 0, 0, 0.2);
-                      padding: 15px;
-                      border-radius: 4px;
-                      border: 1px solid var(--border);
+                      margin-top: 20px;
+                      font-size: 0.8em;
+                      color: var(--text-muted);
+                      font-style: italic;
+                      text-align: center;
+                      border-top: 1px solid var(--border);
+                      padding-top: 10px;
                     "
                   >
-                    <h4
-                      style="
-                        font-size: 1em;
-                        margin-bottom: 10px;
-                        color: var(--text-main);
-                      "
-                    >
-                      Prix de base (Vente)
-                    </h4>
-                    <ul
-                      style="
-                        list-style: none;
-                        padding: 0;
-                        font-size: 0.9em;
-                        color: var(--text-muted);
-                      "
-                    >
-                      <li
-                        style="
-                          display: flex;
-                          justify-content: space-between;
-                          margin-bottom: 5px;
-                        "
-                      >
-                        <span>Petit bois :</span> <span>1 S</span>
-                      </li>
-                      <li
-                        style="
-                          display: flex;
-                          justify-content: space-between;
-                          margin-bottom: 5px;
-                        "
-                      >
-                        <span>Charbon Pauvre :</span> <span>1 S</span>
-                      </li>
-                      <li
-                        style="
-                          display: flex;
-                          justify-content: space-between;
-                          margin-bottom: 5px;
-                        "
-                      >
-                        <span>Charbon Normale :</span> <span>1 S</span>
-                      </li>
-                      <li
-                        style="
-                          display: flex;
-                          justify-content: space-between;
-                          margin-bottom: 5px;
-                        "
-                      >
-                        <span>Briquettes :</span> <span>4 S</span>
-                      </li>
-                      <li style="display: flex; justify-content: space-between">
-                        <span>Coke de charbon :</span> <span>6 S</span>
-                      </li>
-                    </ul>
+                    Document de référence - Réunion du 30/10
                   </div>
                 </div>
               </div>

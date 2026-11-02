@@ -1104,3 +1104,66 @@ header {
   font-size: 0.95em;
   line-height: 1.5;
 }
+/* =========================================
+   TABLEAU DES PRIX (PAGE SAISIE)
+   ========================================= */
+.price-section {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 15px;
+}
+
+.section-title {
+  font-family: "Cinzel", serif;
+  font-size: 1.1em;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.price-table {
+  background: transparent !important;
+  border: none !important;
+}
+
+.price-table th {
+  background: rgba(255, 255, 255, 0.03) !important;
+  font-size: 0.8em !important;
+  padding: 8px 10px !important;
+  text-align: center !important;
+}
+
+.price-table td {
+  padding: 8px 10px !important;
+  text-align: center !important;
+  font-size: 0.95em;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.05) !important;
+}
+
+/* On enlève la bordure du dernier rang */
+.price-table tr:last-child td {
+  border-bottom: none !important;
+}
+
+/* Style des prix */
+.text-success {
+  color: var(--success);
+  font-weight: 700;
+  font-family: "Cinzel";
+  font-size: 1.05em;
+}
+.text-warning {
+  color: var(--warning);
+  font-weight: 700;
+  font-family: "Cinzel";
+  font-size: 1.05em;
+}
+.text-danger {
+  color: var(--danger);
+  font-weight: 700;
+  font-family: "Cinzel";
+  font-size: 1.05em;
+}
