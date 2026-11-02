@@ -148,7 +148,6 @@
         </aside>
 
         <main class="content">
-          <!-- CONTENEUR CENTRÉ -->
           <div class="content-inner">
             <!-- ONGLET COMMANDES -->
             <section id="tab-commandes" class="tab-content active">
@@ -230,7 +229,7 @@
               </div>
             </section>
 
-            <!-- ONGLET SAISIE DIRECTE (AMÉLIORÉ) -->
+            <!-- ONGLET SAISIE DIRECTE -->
             <section id="tab-saisie" class="tab-content">
               <h2 class="page-title">Enregistrer une opération</h2>
               <div class="grid-layout-equal">
@@ -306,8 +305,6 @@
                     </button>
                   </form>
                 </div>
-
-                <!-- PANNEAU POUR REMPLIR L'ESPACE -->
                 <div class="card">
                   <h3><i class="fa-solid fa-circle-info"></i> Informations</h3>
                   <p
@@ -319,8 +316,7 @@
                     "
                   >
                     Le formulaire ci-contre permet d'enregistrer manuellement
-                    une transaction. Le coût total se calcule automatiquement en
-                    fonction de la quantité et du prix unitaire.
+                    une transaction.
                   </p>
                   <div
                     style="
@@ -337,7 +333,7 @@
                         color: var(--text-main);
                       "
                     >
-                      Rappel des prix de base
+                      Prix de base (Vente)
                     </h4>
                     <ul
                       style="
@@ -392,7 +388,7 @@
               </div>
             </section>
 
-            <!-- ONGLET LOCATION DE TONNEAUX -->
+            <!-- ONGLET LOCATION DE TONNEAUX (23 Tonneaux) -->
             <section id="tab-location" class="tab-content">
               <h2 class="page-title">Location de Tonneaux</h2>
               <p
@@ -405,8 +401,7 @@
                 Tarif : <strong>50 Septims / semaine</strong>.
               </p>
               <div class="barrels-grid">
-                <!-- Les cartes sont générées par le HTML précédent (je les omet pour faire court, remets tes 22 divs barrel-card ici) -->
-                <p>Génération des cartes via HTML (voir code précédent)</p>
+                <!-- Tonneaux 1 à 22 générés par JS, on ajoute le 23ème ici -->
               </div>
             </section>
 
@@ -595,13 +590,11 @@
               </div>
             </section>
           </div>
-          <!-- Fin content-inner -->
         </main>
       </div>
     </div>
 
-    <!-- MODALES (Identiques à ton code précédent) -->
-    <!-- POP-UP CLASSIQUE -->
+    <!-- MODALES -->
     <div id="custom-popup" class="modal-overlay">
       <div class="modal-box">
         <h3 id="popup-title">Titre</h3>
@@ -609,7 +602,6 @@
         <button class="btn-primary" onclick="closePopup()">Compris</button>
       </div>
     </div>
-    <!-- MODALE ALLOUER TONNEAU -->
     <div id="allocate-barrel-modal" class="modal-overlay">
       <div class="modal-box">
         <h3>Allouer un Tonneau</h3>
@@ -649,7 +641,6 @@
         </div>
       </div>
     </div>
-    <!-- MODALE CREER FOUR -->
     <div id="create-furnace-modal" class="modal-overlay">
       <div class="modal-box">
         <h3>Nouveau Client (Four)</h3>
@@ -660,7 +651,7 @@
             font-size: 0.9em;
           "
         >
-          Entrez le nom du client. Il apparaîtra dans la liste pour être payé.
+          Entrez le nom du client.
         </p>
         <div class="input-group" style="margin-bottom: 20px">
           <input
@@ -687,7 +678,6 @@
         </div>
       </div>
     </div>
-    <!-- MODALE CONFIRMATION -->
     <div id="confirm-modal" class="modal-overlay">
       <div class="modal-box">
         <h3 id="confirm-title">Confirmation</h3>
@@ -709,7 +699,6 @@
         </div>
       </div>
     </div>
-    <!-- MODALE HISTORIQUE EMPLOYÉ -->
     <div id="user-history-modal" class="modal-overlay">
       <div
         class="modal-box"

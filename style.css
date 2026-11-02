@@ -810,3 +810,11 @@ header {
   font-size: 0.9em;
   line-height: 1.4;
 }
+/* --- BOUTON CONTREMAÎTRE --- */
+.btn-contremaitre {
+  background: #3498db;
+  color: white;
+}
+.btn-contremaitre:hover {
+  filter: brightness(1.1);
+}

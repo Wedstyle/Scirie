@@ -36,7 +36,9 @@ const typeColors = {
   "Location four": "#e67e22",
 };
 
+// ==========================================
 // --- UI HELPERS ---
+// ==========================================
 function showPopup(title, message) {
   document.getElementById("popup-title").innerText = title;
   document.getElementById("popup-message").innerText = message;
@@ -77,7 +79,9 @@ function switchTab(tabId, btnElement) {
   if (btnElement) btnElement.classList.add("active");
 }
 
+// ==========================================
 // --- GESTION DES PÉRIODES ---
+// ==========================================
 function changePeriod(val) {
   currentPeriod = val;
   loadPatronData();
@@ -104,7 +108,9 @@ function getFilteredTransactions(transactions) {
   });
 }
 
+// ==========================================
 // --- AUTHENTIFICATION ---
+// ==========================================
 async function register() {
   const pseudo = document.getElementById("reg-pseudo").value.trim();
   const password = document.getElementById("reg-password").value;
@@ -147,7 +153,9 @@ async function logout() {
   location.reload();
 }
 
+// ==========================================
 // --- INITIALISATION & RÔLES ---
+// ==========================================
 async function checkUserStatus() {
   let { data: profile } = await db
     .from("profiles")
@@ -167,36 +175,56 @@ async function checkUserStatus() {
 
   userProfile = profile;
   document.getElementById("user-display-name").innerText = profile.full_name;
-  document.getElementById("user-role-badge").innerText =
-    profile.role === "patron" ? "Patron" : "Employé";
+
+  let roleText = "Employé";
+  if (profile.role === "patron") roleText = "Patron";
+  if (profile.role === "contremaitre") roleText = "Contremaître";
+  document.getElementById("user-role-badge").innerText = roleText;
 
   document.getElementById("auth-screen").style.display = "none";
   document.getElementById("pending-screen").style.display = "none";
   document.getElementById("app-screen").style.display = "block";
 
-  document.getElementById("nav-four").style.display = "flex";
-
+  // Configuration des menus selon le rôle
   if (profile.role === "patron") {
-    document.getElementById("nav-historique").style.display = "none";
     document.getElementById("nav-gestion").style.display = "flex";
     document.getElementById("nav-location").style.display = "flex";
+    document.getElementById("nav-four").style.display = "flex";
+    document.getElementById("nav-historique").style.display = "none";
     switchTab("tab-gestion", document.getElementById("nav-gestion"));
     loadPatronData();
-    loadEmployeData();
     loadBarrels();
     loadFurnaces();
+    loadEmployeData();
+  } else if (profile.role === "contremaitre") {
+    if (!profile.is_approved) {
+      document.getElementById("app-screen").style.display = "none";
+      document.getElementById("pending-screen").style.display = "flex";
+      return;
+    }
+    // Le contremaître voit tout SAUF la gestion (tableau de bord)
+    document.getElementById("nav-gestion").style.display = "none";
+    document.getElementById("nav-location").style.display = "flex";
+    document.getElementById("nav-four").style.display = "flex";
+    document.getElementById("nav-historique").style.display = "flex";
+    switchTab("tab-commandes", document.querySelector(".nav-btn"));
+    loadBarrels();
+    loadFurnaces();
+    loadEmployeData();
   } else {
     if (!profile.is_approved) {
       document.getElementById("app-screen").style.display = "none";
       document.getElementById("pending-screen").style.display = "flex";
       return;
     }
-    document.getElementById("nav-historique").style.display = "flex";
+    // L'employé classique
     document.getElementById("nav-gestion").style.display = "none";
-    document.getElementById("nav-location").style.display = "none";
+    document.getElementById("nav-location").style.display = "none"; // Tonneau : Patron/Contremaitre uniquement
+    document.getElementById("nav-four").style.display = "flex";
+    document.getElementById("nav-historique").style.display = "flex";
     switchTab("tab-commandes", document.querySelector(".nav-btn"));
-    loadEmployeData();
     loadFurnaces();
+    loadEmployeData();
   }
 
   loadStock();
@@ -204,81 +232,71 @@ async function checkUserStatus() {
   updateBasePrice();
 }
 
-// --- LOCATION DE TONNEAUX ---
+// ==========================================
+// --- GESTION DES TONNEAUX (23 TONNEAUX) ---
+// ==========================================
 async function loadBarrels() {
   const { data: rentals } = await db.from("barrel_rentals").select("*");
-  const container = document.querySelector(".barrels-grid");
+  const container = document.querySelector("#tab-location .barrels-grid");
 
-  // Si le conteneur n'existe pas (ex: on est sur l'onglet four), on ne fait rien
-  if (
-    !container ||
-    !document.getElementById("tab-location").classList.contains("active")
-  ) {
-    // On attend que l'utilisateur clique sur l'onglet pour générer le HTML
+  if (!container) return;
+
+  // Générer les 23 cartes si elles n'existent pas
+  if (!document.getElementById("barrel-1")) {
+    container.innerHTML = "";
+    for (let i = 1; i <= 23; i++) {
+      container.innerHTML += `
+            <div class="barrel-card free" id="barrel-${i}">
+                <div class="barrel-header"><h3>Tonneau n°${i}</h3><span class="status-badge">Libre</span></div>
+                <div class="barrel-body"><div class="client-name"></div><div class="pay-info"></div></div>
+                <div class="barrel-actions"><button class="btn-allocate" onclick="allocateBarrel(${i})">Allouer</button></div>
+            </div>`;
+    }
   }
 
-  // Pour éviter de régénérer tout le temps, on vérifie si les cartes sont déjà là
-  if (container && document.getElementById("barrel-1")) {
-    for (let i = 1; i <= 22; i++) {
-      const card = document.getElementById(`barrel-${i}`);
-      if (!card) continue;
-      const rental = rentals
-        ? rentals.find((r) => r.barrel_number === i)
-        : null;
-      card.className = "barrel-card free";
-      const statusEl = card.querySelector(".status-badge");
-      const clientEl = card.querySelector(".client-name");
-      const payInfoEl = card.querySelector(".pay-info");
-      const actionsEl = card.querySelector(".barrel-actions");
+  for (let i = 1; i <= 23; i++) {
+    const card = document.getElementById(`barrel-${i}`);
+    if (!card) continue;
+    const rental = rentals ? rentals.find((r) => r.barrel_number === i) : null;
 
-      if (rental) {
-        clientEl.innerHTML = `<i class="fa-solid fa-user"></i> ${rental.client_name}`;
-        if (rental.last_payment_date) {
-          const lastPay = new Date(rental.last_payment_date);
-          const nextPay = new Date(lastPay);
-          nextPay.setDate(nextPay.getDate() + 7);
-          const now = new Date();
-          const diffDays = Math.ceil(
-            (nextPay.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
-          );
-          const options = { day: "2-digit", month: "2-digit", year: "numeric" };
+    card.className = "barrel-card free";
+    const statusEl = card.querySelector(".status-badge");
+    const clientEl = card.querySelector(".client-name");
+    const payInfoEl = card.querySelector(".pay-info");
+    const actionsEl = card.querySelector(".barrel-actions");
 
-          if (diffDays < 0) {
-            card.classList.add("late");
-            statusEl.innerText = "En retard";
-            payInfoEl.innerHTML = `<span>Dernier : ${lastPay.toLocaleDateString("fr-FR", options)}</span><span class="next-pay-date">Dû le : ${nextPay.toLocaleDateString("fr-FR", options)}</span><span style="color: var(--danger); font-weight: bold;">Retard de ${Math.abs(diffDays)}j</span>`;
-          } else {
-            card.classList.add("paid");
-            statusEl.innerText = "À jour";
-            payInfoEl.innerHTML = `<span>Dernier : ${lastPay.toLocaleDateString("fr-FR", options)}</span><span class="next-pay-date">Prochain : <strong>${nextPay.toLocaleDateString("fr-FR", options)}</strong></span><span>Dans ${diffDays}j</span>`;
-          }
-        } else {
+    if (rental) {
+      clientEl.innerHTML = `<i class="fa-solid fa-user"></i> ${rental.client_name}`;
+      if (rental.last_payment_date) {
+        const lastPay = new Date(rental.last_payment_date);
+        const nextPay = new Date(lastPay);
+        nextPay.setDate(nextPay.getDate() + 7);
+        const now = new Date();
+        const diffDays = Math.ceil(
+          (nextPay.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
+        );
+        const options = { day: "2-digit", month: "2-digit", year: "numeric" };
+
+        if (diffDays < 0) {
           card.classList.add("late");
-          statusEl.innerText = "Jamais payé";
-          payInfoEl.innerHTML = `<span style="color: var(--danger);">Aucun paiement</span>`;
+          statusEl.innerText = "En retard";
+          payInfoEl.innerHTML = `<span>Dernier : ${lastPay.toLocaleDateString("fr-FR", options)}</span><span class="next-pay-date">Dû le : ${nextPay.toLocaleDateString("fr-FR", options)}</span><span style="color: var(--danger); font-weight: bold;">Retard de ${Math.abs(diffDays)}j</span>`;
+        } else {
+          card.classList.add("paid");
+          statusEl.innerText = "À jour";
+          payInfoEl.innerHTML = `<span>Dernier : ${lastPay.toLocaleDateString("fr-FR", options)}</span><span class="next-pay-date">Prochain : <strong>${nextPay.toLocaleDateString("fr-FR", options)}</strong></span><span>Dans ${diffDays}j</span>`;
         }
-        actionsEl.innerHTML = `<button class="btn-pay" onclick="payBarrel(${rental.id}, ${i}, '${rental.client_name}')"><i class="fa-solid fa-coins"></i> Encaisser 50</button><button class="btn-free" onclick="freeBarrel(${rental.id})"><i class="fa-solid fa-trash"></i> Libérer</button>`;
       } else {
-        clientEl.innerHTML = "";
-        payInfoEl.innerHTML = "";
-        statusEl.innerText = "Libre";
-        actionsEl.innerHTML = `<button class="btn-allocate" onclick="allocateBarrel(${i})"><i class="fa-solid fa-plus"></i> Allouer</button>`;
+        card.classList.add("late");
+        statusEl.innerText = "Jamais payé";
+        payInfoEl.innerHTML = `<span style="color: var(--danger);">Aucun paiement</span>`;
       }
-    }
-  } else {
-    // Génération initiale des 22 cartes si elles n'existent pas
-    if (container) {
-      container.innerHTML = "";
-      for (let i = 1; i <= 22; i++) {
-        container.innerHTML += `
-                <div class="barrel-card free" id="barrel-${i}">
-                    <div class="barrel-header"><h3>Tonneau n°${i}</h3><span class="status-badge">Libre</span></div>
-                    <div class="barrel-body"><div class="client-name"></div><div class="pay-info"></div></div>
-                    <div class="barrel-actions"><button class="btn-allocate" onclick="allocateBarrel(${i})">Allouer</button></div>
-                </div>`;
-      }
-      // Une fois générées, on rappelle la fonction pour les remplir
-      loadBarrels();
+      actionsEl.innerHTML = `<button class="btn-pay" onclick="payBarrel(${rental.id}, ${i}, '${rental.client_name}')"><i class="fa-solid fa-coins"></i> Encaisser 50</button><button class="btn-free" onclick="freeBarrel(${rental.id})"><i class="fa-solid fa-trash"></i> Libérer</button>`;
+    } else {
+      clientEl.innerHTML = "";
+      payInfoEl.innerHTML = "";
+      statusEl.innerText = "Libre";
+      actionsEl.innerHTML = `<button class="btn-allocate" onclick="allocateBarrel(${i})"><i class="fa-solid fa-plus"></i> Allouer</button>`;
     }
   }
 }
@@ -298,6 +316,7 @@ function closeAllocateModal() {
   document.getElementById("allocate-barrel-modal").style.display = "none";
   currentBarrelToAllocate = null;
 }
+
 async function confirmAllocateBarrel() {
   const clientName = document
     .getElementById("allocate-client-name")
@@ -318,6 +337,7 @@ async function confirmAllocateBarrel() {
     loadBarrels();
   }
 }
+
 async function payBarrel(id, num, clientName) {
   showConfirm(
     "Encaisser",
@@ -340,11 +360,11 @@ async function payBarrel(id, num, clientName) {
         });
       showPopup("Payé", `50 Septims encaissés.`);
       loadBarrels();
-      loadPatronData();
-      if (userProfile.role !== "patron") loadEmployeData();
+      if (userProfile.role === "patron") loadPatronData();
     },
   );
 }
+
 async function freeBarrel(id) {
   showConfirm(
     "Libérer",
@@ -356,7 +376,9 @@ async function freeBarrel(id) {
   );
 }
 
+// ==========================================
 // --- LOCATION DE FOUR ---
+// ==========================================
 async function loadFurnaces() {
   const { data: furnaces } = await db
     .from("furnace_rentals")
@@ -488,7 +510,9 @@ async function freeFurnace(id) {
   );
 }
 
+// ==========================================
 // --- COMMANDES & STOCK ---
+// ==========================================
 async function createOrder(e) {
   e.preventDefault();
   const client_name = document.getElementById("ord-client").value.trim();
@@ -612,7 +636,9 @@ async function updateStockManual(id, newQty) {
     .eq("id", id);
 }
 
-// --- SAISIE DIRECTE ---
+// ==========================================
+// --- SAISIE DIRECTE & HISTORIQUE ---
+// ==========================================
 function updateBasePrice() {
   const type = document.getElementById("emp-type").value;
   const select = document.getElementById("emp-item");
@@ -699,23 +725,26 @@ async function loadEmployeData() {
   }
 }
 
-// --- VUE GESTION (PATRON) ---
+// ==========================================
+// --- VUE GESTION (PATRON UNIQUEMENT) ---
+// ==========================================
 async function loadPatronData() {
-  const personnelDiv = document.getElementById("admin-personnel-list");
-  personnelDiv.innerHTML =
-    '<p class="text-muted" style="font-size:0.9em;">Chargement...</p>';
-
   const { data: personnel, error } = await db
     .from("profiles")
     .select("*")
     .order("created_at", { ascending: true });
+  const personnelDiv = document.getElementById("admin-personnel-list");
+  const salDiv = document.getElementById("admin-salaries-list");
+
+  personnelDiv.innerHTML = "";
+  salDiv.innerHTML = "";
 
   if (error) {
     personnelDiv.innerHTML = `<p class="text-danger">Erreur : ${error.message}</p>`;
   } else if (!personnel || personnel.length === 0) {
     personnelDiv.innerHTML = `<div class="empty-state"><i class="fa-solid fa-users-slash"></i><p>Aucun employé enregistré.</p></div>`;
+    salDiv.innerHTML = `<div class="empty-state"><p>Aucun contrat.</p></div>`;
   } else {
-    personnelDiv.innerHTML = "";
     personnel.forEach((p) => {
       const isMe = p.id === currentUser.id;
       let actionHtml = "";
@@ -727,38 +756,55 @@ async function loadPatronData() {
                               <button class="btn-action btn-fire" onclick="event.stopPropagation(); virerUtilisateur('${p.id}', '${p.full_name}')"><i class="fa-solid fa-trash"></i></button>`;
       }
 
-      if (p.role === "employe" && p.is_approved) {
+      // Bouton Contremaître (seulement si validé et n'est pas déjà contremaître ou patron)
+      if (p.is_approved && p.role === "employe" && !isMe) {
         actionHtml =
-          `<button class="btn-action btn-promote" onclick="event.stopPropagation(); promouvoirUtilisateur('${p.id}')"><i class="fa-solid fa-arrow-up"></i></button>` +
+          `<button class="btn-action btn-contremaitre" onclick="event.stopPropagation(); changerRole('${p.id}', 'contremaitre')" title="Nommer Contremaître"><i class="fa-solid fa-hard-hat"></i></button>` +
+          actionHtml;
+      }
+      if (p.is_approved && p.role === "contremaitre" && !isMe) {
+        actionHtml =
+          `<button class="btn-action btn-secondary" onclick="event.stopPropagation(); changerRole('${p.id}', 'employe')" title="Rétrograder Employé"><i class="fa-solid fa-arrow-down"></i></button>` +
+          actionHtml;
+      }
+      if (p.role === "employe" && p.is_approved && !isMe) {
+        actionHtml =
+          `<button class="btn-action btn-promote" onclick="event.stopPropagation(); changerRole('${p.id}', 'patron')" title="Promouvoir Patron"><i class="fa-solid fa-crown"></i></button>` +
           actionHtml;
       }
 
-      const roleBadge =
-        p.role === "patron"
-          ? '<span style="color:var(--primary); font-weight:bold;">Patron</span>'
-          : "Employé";
+      let roleBadge = "Employé";
+      let badgeColor = "var(--text-muted)";
+      if (p.role === "patron") {
+        roleBadge = "Patron";
+        badgeColor = "var(--primary)";
+      }
+      if (p.role === "contremaitre") {
+        roleBadge = "Contremaître";
+        badgeColor = "#3498db";
+      }
+
       const statusBadge = p.is_approved
         ? ""
         : '<span style="color:var(--danger); font-weight:bold;">(En attente)</span>';
 
       personnelDiv.innerHTML += `
                 <div class="personnel-row" style="cursor: pointer;" onclick="showUserHistory('${p.id}', '${p.full_name}')">
-                    <div class="personnel-info"><strong>${p.full_name} ${isMe ? "(Vous)" : ""}</strong><span>Rôle : ${roleBadge} ${statusBadge}</span></div>
+                    <div class="personnel-info"><strong>${p.full_name} ${isMe ? "(Vous)" : ""}</strong><span>Rôle : <span style="color:${badgeColor}; font-weight:bold;">${roleBadge}</span> ${statusBadge}</span></div>
                     <div class="personnel-actions">${actionHtml}</div>
                 </div>`;
-    });
-  }
 
-  const { data: employees } = await db.from("employees").select("*");
-  const salDiv = document.getElementById("admin-salaries-list");
-  if (employees && employees.length > 0) {
-    salDiv.innerHTML = "";
-    employees.forEach(
-      (e) =>
-        (salDiv.innerHTML += `<div class="salary-row"><input type="text" value="${e.name}" id="sal-name-${e.id}" placeholder="Nom"><input type="number" value="${e.salary}" id="sal-amount-${e.id}" placeholder="Septims"></div>`),
-    );
-  } else {
-    salDiv.innerHTML = `<div class="empty-state" style="padding: 10px;"><p>Aucun contrat de travail.</p></div>`;
+      if (p.is_approved) {
+        salDiv.innerHTML += `
+                    <div class="salary-row" style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+                        <span style="flex:1; font-weight:500;">${p.full_name}</span>
+                        <input type="number" value="${p.salary || 0}" id="sal-amount-${p.id}" placeholder="0" style="width:80px;">
+                        <span style="font-size:0.8em; color:var(--text-muted);">S</span>
+                    </div>`;
+      }
+    });
+    if (salDiv.innerHTML === "")
+      salDiv.innerHTML = `<div class="empty-state"><p>Aucun employé validé.</p></div>`;
   }
 
   const { data: allTransactions } = await db
@@ -766,7 +812,6 @@ async function loadPatronData() {
     .select("*")
     .order("created_at", { ascending: false });
   const filtered = getFilteredTransactions(allTransactions);
-
   const tbody = document.getElementById("admin-history-body");
 
   if (filtered && filtered.length > 0) {
@@ -814,15 +859,17 @@ async function loadPatronData() {
 
     renderCharts(filtered);
   } else {
-    tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><i class="fa-solid fa-list"></i><p>Aucune transaction sur cette période.</p></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><i class="fa-solid fa-list"></i><p>Aucune transaction.</p></div></td></tr>`;
     document.getElementById("stat-ventes").innerText = "0.00 S";
     document.getElementById("stat-achats").innerText = "0.00 S";
     document.getElementById("stat-benefice").innerText = "0.00 S";
-    renderCharts([]); // Vide les graphiques
+    renderCharts([]);
   }
 }
 
-// --- HISTORIQUE & GRAPHIQUES ---
+// ==========================================
+// --- HISTORIQUE INDIVIDUEL & GRAPHIQUES ---
+// ==========================================
 async function showUserHistory(userId, userName) {
   document.getElementById("user-history-title").innerText =
     `Historique de ${userName}`;
@@ -938,7 +985,9 @@ function renderCharts(transactions) {
   });
 }
 
-// --- ACTIONS PATRON ---
+// ==========================================
+// --- ACTIONS PATRON (GESTION PERSONNEL) ---
+// ==========================================
 async function validerUtilisateur(id) {
   const { error } = await db
     .from("profiles")
@@ -950,19 +999,31 @@ async function validerUtilisateur(id) {
     loadPatronData();
   }
 }
-async function promouvoirUtilisateur(id) {
-  showConfirm("Promouvoir", "Nommer ce joueur Patron ?", async () => {
-    const { error } = await db
-      .from("profiles")
-      .update({ role: "patron" })
-      .eq("id", id);
-    if (error) showPopup("Erreur", "Impossible.");
-    else {
-      showPopup("Promu", "Le joueur est Patron.");
-      loadPatronData();
-    }
-  });
+
+async function changerRole(id, nouveauRole) {
+  const roleNom =
+    nouveauRole === "patron"
+      ? "Patron"
+      : nouveauRole === "contremaitre"
+        ? "Contremaître"
+        : "Employé";
+  showConfirm(
+    "Changement de rôle",
+    `Nommer cet utilisateur ${roleNom} ?`,
+    async () => {
+      const { error } = await db
+        .from("profiles")
+        .update({ role: nouveauRole })
+        .eq("id", id);
+      if (error) showPopup("Erreur", "Impossible de changer le rôle.");
+      else {
+        showPopup("Succès", `Le joueur est maintenant ${roleNom}.`);
+        loadPatronData();
+      }
+    },
+  );
 }
+
 async function virerUtilisateur(id, nom) {
   showConfirm("Virer", `VIRER ${nom} ?`, async () => {
     const { error } = await db.rpc("supprimer_utilisateur", {
@@ -975,6 +1036,7 @@ async function virerUtilisateur(id, nom) {
     }
   });
 }
+
 async function deleteTransaction(id) {
   showConfirm("Supprimer", "Supprimer cette transaction ?", async () => {
     await db.from("transactions").delete().eq("id", id);
@@ -982,53 +1044,83 @@ async function deleteTransaction(id) {
     loadEmployeData();
   });
 }
+
+// ==========================================
+// --- SALAIRES (SAUVEGARDE ET PAIEMENT) ---
+// ==========================================
 async function saveSalaries() {
-  const updates = [];
-  document.querySelectorAll('[id^="sal-name-"]').forEach((input) => {
-    const id = input.id.replace("sal-name-", "");
-    updates.push({
-      id,
-      name: input.value,
-      salary:
-        parseFloat(document.getElementById(`sal-amount-${id}`).value) || 0,
-    });
+  const inputs = document.querySelectorAll('[id^="sal-amount-"]');
+  if (inputs.length === 0) return showPopup("Info", "Aucun employé à payer.");
+
+  let updates = [];
+  inputs.forEach((input) => {
+    const id = input.id.replace("sal-amount-", "");
+    const salary = parseFloat(input.value) || 0;
+    updates.push({ id: id, salary: salary });
   });
-  await db.from("employees").upsert(updates);
-  showPopup("Sauvegardé", "Contrats mis à jour.");
-  loadPatronData();
-}
-async function paySalaries() {
-  showConfirm("Payer", "Payer tous les salaires ?", async () => {
-    const { data: employees } = await db.from("employees").select("*");
-    const toPay = employees.filter((e) => e.salary > 0);
-    if (toPay.length === 0) return showPopup("Info", "Aucun salaire.");
-    let totalPaye = 0;
-    const transactionsToInsert = toPay.map((e) => {
-      totalPaye += e.salary;
-      return {
-        type: "salaire",
-        item_type: "Salaire",
-        counterparty_name: e.name,
-        quantity: 1,
-        unit_price: e.salary,
-        created_by: currentUser.id,
-      };
-    });
-    const { error } = await db
-      .from("transactions")
-      .insert(transactionsToInsert);
-    if (error) showPopup("Erreur", error.message);
-    else {
-      showPopup(
-        "Salaires Payés",
-        `${totalPaye.toFixed(2)} Septims distribués.`,
-      );
-      loadPatronData();
-    }
-  });
+
+  const { error } = await db.from("profiles").upsert(updates);
+
+  if (error) {
+    console.error(error);
+    showPopup("Erreur", "Impossible de sauvegarder les salaires.");
+  } else {
+    showPopup("Sauvegardé", "Les salaires ont été enregistrés.");
+    loadPatronData();
+  }
 }
 
+async function paySalaries() {
+  const { data: personnel } = await db
+    .from("profiles")
+    .select("*")
+    .eq("is_approved", true);
+  const toPay = personnel.filter((p) => p.salary > 0);
+
+  if (toPay.length === 0) {
+    return showPopup(
+      "Info",
+      "Aucun salaire à payer (les montants sont à 0). N'oubliez pas de cliquer sur 'Sauvegarder' avant de payer.",
+    );
+  }
+
+  showConfirm(
+    "Payer les salaires",
+    `Payer un total de ${toPay.reduce((acc, curr) => acc + curr.salary, 0)} Septims ?`,
+    async () => {
+      let totalPaye = 0;
+      const transactionsToInsert = toPay.map((p) => {
+        totalPaye += p.salary;
+        return {
+          type: "salaire",
+          item_type: "Salaire",
+          counterparty_name: p.full_name,
+          quantity: 1,
+          unit_price: p.salary,
+          created_by: currentUser.id,
+        };
+      });
+
+      const { error } = await db
+        .from("transactions")
+        .insert(transactionsToInsert);
+
+      if (error) {
+        showPopup("Erreur", error.message);
+      } else {
+        showPopup(
+          "Salaires Payés",
+          `${totalPaye.toFixed(2)} Septims distribués.`,
+        );
+        loadPatronData();
+      }
+    },
+  );
+}
+
+// ==========================================
 // --- DÉMARRAGE ---
+// ==========================================
 db.auth.getSession().then(({ data: { session } }) => {
   if (session) {
     currentUser = session.user;
