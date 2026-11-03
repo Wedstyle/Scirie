@@ -245,7 +245,7 @@ async function checkUserStatus() {
 }
 
 // ==========================================
-// --- REALTIME (MISE À JOUR EN DIRECT OPTIMISÉE) ---
+// --- REALTIME (MISE À JOUR EN DIRECT) ---
 // ==========================================
 function setupRealtime() {
   if (realtimeChannel) db.removeChannel(realtimeChannel);
@@ -494,7 +494,6 @@ function updateBasePrice() {
     document.getElementById("emp-price").value = "";
   } else {
     customRow.style.display = "none";
-    // ON GARDE LES DÉCIMALES ICI
     let price =
       type === "vente"
         ? basePricesVente[item] || 0
@@ -518,7 +517,6 @@ document.getElementById("emp-price").addEventListener("input", calcEmpTotal);
 function calcEmpTotal() {
   const q = parseFloat(document.getElementById("emp-quantity").value) || 0;
   const p = parseFloat(document.getElementById("emp-price").value) || 0;
-  // On arrondit SEULEMENT le total final
   document.getElementById("emp-total").value = (q * p).toFixed(2) + " S";
 }
 
@@ -527,7 +525,6 @@ async function addTransaction(e) {
   const type = document.getElementById("emp-type").value;
   let item_type = document.getElementById("emp-item").value;
   const quantity = parseFloat(document.getElementById("emp-quantity").value);
-  // ON GARDE LES DÉCIMALES POUR LE PRIX UNITAIRE
   const unit_price = parseFloat(document.getElementById("emp-price").value);
 
   if (item_type === "Divers") {
@@ -691,13 +688,14 @@ async function loadPatronData() {
         textClass = cost >= 0 ? "text-success" : "text-danger";
       }
 
-      // On affiche le coût arrondi, mais on garde la vraie valeur pour les stats
       tbody.innerHTML += `
                 <tr>
                     <td>${new Date(t.created_at).toLocaleDateString()}</td>
                     <td>${t.counterparty_name}</td>
                     <td><span class="badge-type ${badgeClass}" style="${t.type === "ajustement" ? "background-color: #3b82f6; color: white;" : ""}">${t.type.toUpperCase()}</span></td>
                     <td><span class="badge-type" style="background-color: ${color}; color: ${textColor};">${t.item_type}</span></td>
+                    <td>${t.quantity}</td>
+                    <td>${parseFloat(t.unit_price).toFixed(2)} S</td> <!-- AJOUT ICI -->
                     <td class="${textClass}">${Math.round(cost)} S</td>
                     <td><button class="btn-icon text-danger" onclick="deleteTransaction(${t.id})"><i class="fa-solid fa-trash"></i></button></td>
                 </tr>`;
@@ -716,7 +714,7 @@ async function loadPatronData() {
 
     renderCharts(filtered);
   } else {
-    tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><i class="fa-solid fa-list"></i><p>Aucune transaction.</p></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><i class="fa-solid fa-list"></i><p>Aucune transaction.</p></div></td></tr>`;
     document.getElementById("stat-ventes").innerText = "0 S";
     document.getElementById("stat-achats").innerText = "0 S";
     document.getElementById("stat-benefice").innerText = "0 S";
@@ -857,7 +855,7 @@ async function showUserHistory(userId, userName) {
   document.getElementById("user-history-title").innerText =
     `Historique de ${userName}`;
   document.getElementById("user-history-body").innerHTML =
-    '<tr><td colspan="4" class="text-center">Chargement...</td></tr>';
+    '<tr><td colspan="6" class="text-center">Chargement...</td></tr>';
   document.getElementById("user-history-modal").style.display = "flex";
 
   const { data: transactions } = await db
@@ -881,10 +879,18 @@ async function showUserHistory(userId, userName) {
             : "bg-red";
       if (t.type === "ajustement") badgeClass = "bg-blue";
 
-      tbody.innerHTML += `<tr><td>${new Date(t.created_at).toLocaleDateString()}</td><td><span class="badge-type ${badgeClass}">${t.type.toUpperCase()}</span></td><td><span class="badge-type" style="background-color: ${color}; color: ${textColor};">${t.item_type}</span></td><td class="${t.type === "vente" ? "text-success" : "text-danger"}">${Math.round(cost)} Septims</td></tr>`;
+      tbody.innerHTML += `
+                <tr>
+                    <td>${new Date(t.created_at).toLocaleDateString()}</td>
+                    <td><span class="badge-type ${badgeClass}">${t.type.toUpperCase()}</span></td>
+                    <td><span class="badge-type" style="background-color: ${color}; color: ${textColor};">${t.item_type}</span></td>
+                    <td>${t.quantity}</td>
+                    <td>${parseFloat(t.unit_price).toFixed(2)} S</td> <!-- AJOUT ICI -->
+                    <td class="${t.type === "vente" ? "text-success" : "text-danger"}">${Math.round(cost)} Septims</td>
+                </tr>`;
     });
   } else {
-    tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state"><i class="fa-solid fa-receipt"></i><p>Aucune transaction.</p></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><i class="fa-solid fa-receipt"></i><p>Aucune transaction.</p></div></td></tr>`;
   }
 }
 function closeUserHistory() {
@@ -1336,7 +1342,6 @@ async function createOrder(e) {
   const client_name = document.getElementById("ord-client").value.trim();
   const item_type = document.getElementById("ord-item").value;
   const quantity = parseFloat(document.getElementById("ord-qty").value);
-  // ON GARDE LES DÉCIMALES ICI AUSSI
   const unit_price = parseFloat(document.getElementById("ord-price").value);
   const deadline = document.getElementById("ord-deadline").value || null;
 
@@ -1451,10 +1456,19 @@ async function loadEmployeData() {
             ? "bg-purple"
             : "bg-red";
       if (t.type === "ajustement") badgeClass = "bg-blue";
-      tbody.innerHTML += `<tr><td>${new Date(t.created_at).toLocaleDateString()}</td><td><span class="badge-type ${badgeClass}">${t.type.toUpperCase()}</span></td><td><span class="badge-type" style="background-color: ${color}; color: ${textColor};">${t.item_type}</span></td><td class="${t.type === "vente" ? "text-success" : "text-danger"}">${Math.round(cost)} Septims</td></tr>`;
+
+      tbody.innerHTML += `
+                <tr>
+                    <td>${new Date(t.created_at).toLocaleDateString()}</td>
+                    <td><span class="badge-type ${badgeClass}">${t.type.toUpperCase()}</span></td>
+                    <td><span class="badge-type" style="background-color: ${color}; color: ${textColor};">${t.item_type}</span></td>
+                    <td>${t.quantity}</td>
+                    <td>${parseFloat(t.unit_price).toFixed(2)} S</td> <!-- AJOUT ICI -->
+                    <td class="${t.type === "vente" ? "text-success" : "text-danger"}">${Math.round(cost)} Septims</td>
+                </tr>`;
     });
   } else {
-    tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state"><i class="fa-solid fa-receipt"></i><p>Aucune opération.</p></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><i class="fa-solid fa-receipt"></i><p>Aucune opération.</p></div></td></tr>`;
   }
 }
 
