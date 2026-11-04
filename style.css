@@ -216,7 +216,7 @@ header {
   font-size: 0.75em;
 }
 
-/* Bouton Burger (Caché par défaut) */
+/* Bouton Burger */
 .burger-menu {
   display: none;
   background: none;
@@ -276,7 +276,7 @@ header {
   text-align: center;
 }
 
-/* Overlay sombre pour fermer le menu sur mobile */
+/* Overlay sombre */
 #sidebar-overlay {
   position: fixed;
   top: 0;
@@ -479,6 +479,8 @@ header {
 .bg-orange p {
   color: var(--warning);
 }
+
+/* Correction Graphiques */
 .charts-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -486,18 +488,20 @@ header {
   margin-bottom: 24px;
 }
 .chart-card {
-  height: 350px;
+  min-height: 380px;
+  height: auto;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   position: relative;
   overflow: hidden;
+  padding-bottom: 20px;
 }
 .chart-card canvas {
-  max-height: 250px !important;
-  max-width: 250px !important;
-  margin: 0 auto;
+  max-height: 220px !important;
+  max-width: 220px !important;
+  margin: 10px auto !important;
 }
 
 /* Cartes Tonneaux/Fours */
@@ -964,7 +968,6 @@ header {
    RESPONSIVE (MOBILE & TABLETTE)
    ========================================= */
 @media (max-width: 1024px) {
-  /* Grilles en 1 colonne */
   .grid-layout,
   .grid-layout-equal,
   .charts-grid {
@@ -972,22 +975,20 @@ header {
   }
   .stats-grid {
     grid-template-columns: 1fr 1fr;
-  } /* 2 cartes par ligne sur tablette */
+  }
 }
 
 @media (max-width: 768px) {
-  /* Header */
   .burger-menu {
     display: block;
-  } /* On affiche le bouton burger */
+  }
   .logo {
     font-size: 1.1em;
   }
   .user-info span:first-child {
     display: none;
-  } /* On cache le nom complet pour gagner de la place */
+  }
 
-  /* Sidebar (Menu glissant) */
   .sidebar {
     position: fixed;
     top: 70px;
@@ -997,7 +998,7 @@ header {
   }
   .sidebar.open {
     transform: translateX(260px);
-  } /* Fait glisser le menu */
+  }
   #sidebar-overlay {
     display: block;
     opacity: 0;
@@ -1009,7 +1010,6 @@ header {
     pointer-events: auto;
   }
 
-  /* Contenu principal */
   .content {
     padding: 15px;
   }
@@ -1018,19 +1018,17 @@ header {
   }
   .stats-grid {
     grid-template-columns: 1fr;
-  } /* 1 seule carte par ligne sur mobile */
+  }
   .card {
     padding: 15px;
   }
 
-  /* Ajustements des tableaux pour mobile */
   .data-table th,
   .data-table td {
     padding: 8px 10px;
     font-size: 0.85em;
   }
 
-  /* Ajustement du formulaire de commande */
   .order-item-row {
     flex-wrap: wrap;
   }

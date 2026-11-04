@@ -12,7 +12,7 @@ let currentPeriod = "all";
 let currentBarrelToAllocate = null;
 let realtimeChannel = null;
 let currentOrders = [];
-let transactionLimit = 50; // Pagination : on charge 50 transactions par défaut
+let transactionLimit = 50;
 
 const basePricesVente = {
   "Petit bois": 0.2,
@@ -92,11 +92,9 @@ function switchTab(tabId, btnElement) {
     .forEach((btn) => btn.classList.remove("active"));
   document.getElementById(tabId).classList.add("active");
   if (btnElement) btnElement.classList.add("active");
-  // Fermer le menu mobile lors d'un changement d'onglet
   if (window.innerWidth <= 768) closeSidebar();
 }
 
-// Menu Burger Mobile
 function toggleSidebar() {
   document.getElementById("sidebar").classList.toggle("open");
   document.getElementById("sidebar-overlay").classList.toggle("active");
@@ -939,7 +937,6 @@ async function addTransaction(e) {
   }
 }
 
-// --- GESTION PATRON (PAGINATION) ---
 async function loadPatronData() {
   const { data: personnel, error } = await db
     .from("profiles")
@@ -996,20 +993,19 @@ async function loadPatronData() {
   }
   updateSalaryTotal();
 
-  // PAGINATION : On limite le nombre de transactions récupérées
   const { data: allT } = await db
     .from("transactions")
     .select("*")
     .order("created_at", { ascending: false })
     .limit(transactionLimit);
-
-  // On récupère TOUTES les transactions pour les stats globales (pour ne pas fausser les totaux)
   const { data: globalT } = await db
     .from("transactions")
-    .select("quantity, unit_price, type, created_at");
+    .select(
+      "quantity, unit_price, type, created_at, item_type, counterparty_name",
+    );
 
-  const filtered = getFilteredTransactions(globalT); // Pour les stats
-  const displayFiltered = getFilteredTransactions(allT); // Pour l'affichage tableau
+  const filtered = getFilteredTransactions(globalT);
+  const displayFiltered = getFilteredTransactions(allT);
 
   const tbody = document.getElementById("admin-history-body");
   if (displayFiltered && displayFiltered.length > 0) {
@@ -1039,7 +1035,6 @@ async function loadPatronData() {
       tbody.innerHTML += `<tr><td>${new Date(t.created_at).toLocaleDateString()}</td><td>${t.counterparty_name}</td><td><span class="badge-type ${bC}" style="${t.type === "ajustement" ? "background-color: #3b82f6; color: white;" : ""}">${t.type.toUpperCase()}</span></td><td><span class="badge-type" style="background-color: ${color}; color: ${textColor};">${t.item_type}</span></td><td>${t.quantity}</td><td>${parseFloat(t.unit_price).toFixed(2)} S</td><td class="${tC}">${Math.round(cost)} S</td><td><button class="btn-icon text-danger" onclick="deleteTransaction(${t.id})"><i class="fa-solid fa-trash"></i></button></td></tr>`;
     });
 
-    // Affichage du bouton "Voir plus" s'il y a plus de données en base que ce qui est affiché
     const btnLoadMore = document.getElementById("btn-load-more");
     if (globalT.length > transactionLimit)
       btnLoadMore.style.display = "inline-block";
@@ -1049,7 +1044,6 @@ async function loadPatronData() {
     document.getElementById("btn-load-more").style.display = "none";
   }
 
-  // Calcul des stats basées sur TOUTES les transactions filtrées
   let tA = 0,
     tV = 0,
     tS = 0;
@@ -1067,44 +1061,39 @@ async function loadPatronData() {
   eB.innerText = Math.round(b) + " S";
   eB.className = b >= 0 ? "text-success" : "text-danger";
 
-  // Graphiques basés sur toutes les transactions filtrées
   renderCharts(filtered);
 }
 
 function renderCharts(transactions) {
-  let achats = {
-    "Petit bois": 0,
-    "Charbon Pauvre": 0,
-    "Charbon Normale": 0,
-    "Briquettes de Charbon": 0,
-    "Coke de charbon": 0,
-    Divers: 0,
-  };
-  let ventes = {
-    "Petit bois": 0,
-    "Charbon Pauvre": 0,
-    "Charbon Normale": 0,
-    "Briquettes de Charbon": 0,
-    "Coke de charbon": 0,
-    "Location tonneau": 0,
-    "Location four": 0,
-  };
+  let achats = {};
+  let ventes = {};
+
   transactions.forEach((t) => {
     const cost = t.quantity * t.unit_price;
     if (t.type === "achat") {
-      if (achats[t.item_type] !== undefined) achats[t.item_type] += cost;
-      else achats["Divers"] += cost;
+      const isStandardItem = [
+        "Petit bois",
+        "Charbon Pauvre",
+        "Charbon Normale",
+        "Briquettes de Charbon",
+        "Coke de charbon",
+      ].includes(t.item_type);
+      const key = isStandardItem ? t.item_type : "Divers";
+      achats[key] = (achats[key] || 0) + cost;
+    } else if (t.type === "vente") {
+      ventes[t.item_type] = (ventes[t.item_type] || 0) + cost;
     }
-    if (t.type === "vente" && ventes[t.item_type] !== undefined)
-      ventes[t.item_type] += cost;
   });
-  const lA = Object.keys(achats).filter((k) => achats[k] > 0);
-  const dA = lA.map((k) => achats[k]);
-  const lV = Object.keys(ventes).filter((k) => ventes[k] > 0);
-  const dV = lV.map((k) => ventes[k]);
+
+  const labelsAchats = Object.keys(achats).filter((k) => achats[k] > 0);
+  const dataAchats = labelsAchats.map((k) => achats[k]);
+  const labelsVentes = Object.keys(ventes).filter((k) => ventes[k] > 0);
+  const dataVentes = labelsVentes.map((k) => ventes[k]);
+
   if (chartAchatsInstance) chartAchatsInstance.destroy();
   if (chartVentesInstance) chartVentesInstance.destroy();
-  const cO = {
+
+  const commonOptions = {
     responsive: true,
     maintainAspectRatio: false,
     layout: { padding: 0 },
@@ -1113,54 +1102,94 @@ function renderCharts(transactions) {
         position: "bottom",
         labels: {
           color: "#94A3B8",
-          font: { family: "Inter", size: 12 },
-          padding: 15,
+          font: { family: "Inter", size: 11 }, // Plus petit
+          padding: 10, // Plus compact
+          boxWidth: 10, // Points plus petits
           usePointStyle: true,
           pointStyle: "circle",
         },
       },
     },
   };
-  const cA = document.getElementById("chart-achats").getContext("2d");
-  chartAchatsInstance = new Chart(cA, {
-    type: "doughnut",
-    data: {
-      labels: lA.length ? lA : ["Vide"],
-      datasets: [
-        {
-          data: dA.length ? dA : [1],
-          backgroundColor: lA.length
-            ? lA.map((l) => typeColors[l] || "#888")
-            : ["#2A2A35"],
-          borderWidth: 0,
-          cutout: "60%",
+
+  const getColor = (label) => {
+    if (typeColors[label]) return typeColors[label];
+    if (label === "Divers") return "#94A3B8";
+    let hash = 0;
+    for (let i = 0; i < label.length; i++)
+      hash = label.charCodeAt(i) + ((hash << 5) - hash);
+    return `hsl(${hash % 360}, 60%, 50%)`;
+  };
+
+  const ctxA = document.getElementById("chart-achats").getContext("2d");
+  if (labelsAchats.length === 0) {
+    chartAchatsInstance = new Chart(ctxA, {
+      type: "doughnut",
+      data: {
+        labels: ["Aucun achat"],
+        datasets: [{ data: [1], backgroundColor: ["#2A2A35"], borderWidth: 0 }],
+      },
+      options: {
+        ...commonOptions,
+        plugins: {
+          ...commonOptions.plugins,
+          legend: { display: false },
+          tooltip: { enabled: false },
         },
-      ],
-    },
-    options: lA.length
-      ? cO
-      : { ...cO, plugins: { ...cO.plugins, legend: { display: false } } },
-  });
-  const cV = document.getElementById("chart-ventes").getContext("2d");
-  chartVentesInstance = new Chart(cV, {
-    type: "doughnut",
-    data: {
-      labels: lV.length ? lV : ["Vide"],
-      datasets: [
-        {
-          data: dV.length ? dV : [1],
-          backgroundColor: lV.length
-            ? lV.map((l) => typeColors[l] || "#888")
-            : ["#2A2A35"],
-          borderWidth: 0,
-          cutout: "60%",
+      },
+    });
+  } else {
+    chartAchatsInstance = new Chart(ctxA, {
+      type: "doughnut",
+      data: {
+        labels: labelsAchats,
+        datasets: [
+          {
+            data: dataAchats,
+            backgroundColor: labelsAchats.map((l) => getColor(l)),
+            borderWidth: 0,
+            cutout: "60%",
+          },
+        ],
+      },
+      options: commonOptions,
+    });
+  }
+
+  const ctxV = document.getElementById("chart-ventes").getContext("2d");
+  if (labelsVentes.length === 0) {
+    chartVentesInstance = new Chart(ctxV, {
+      type: "doughnut",
+      data: {
+        labels: ["Aucune vente"],
+        datasets: [{ data: [1], backgroundColor: ["#2A2A35"], borderWidth: 0 }],
+      },
+      options: {
+        ...commonOptions,
+        plugins: {
+          ...commonOptions.plugins,
+          legend: { display: false },
+          tooltip: { enabled: false },
         },
-      ],
-    },
-    options: lV.length
-      ? cO
-      : { ...cO, plugins: { ...cO.plugins, legend: { display: false } } },
-  });
+      },
+    });
+  } else {
+    chartVentesInstance = new Chart(ctxV, {
+      type: "doughnut",
+      data: {
+        labels: labelsVentes,
+        datasets: [
+          {
+            data: dataVentes,
+            backgroundColor: labelsVentes.map((l) => getColor(l)),
+            borderWidth: 0,
+            cutout: "60%",
+          },
+        ],
+      },
+      options: commonOptions,
+    });
+  }
 }
 
 // ... Le reste des fonctions (modales, tonneaux, fours) reste identique ...
