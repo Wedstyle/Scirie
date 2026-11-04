@@ -163,71 +163,107 @@
             <!-- ONGLET COMMANDES -->
             <section id="tab-commandes" class="tab-content active">
               <h2 class="page-title">Bons de Commande</h2>
-              <div class="grid-layout">
-                <div class="card">
+              <div class="grid-layout" style="grid-template-columns: 400px 1fr">
+                <!-- Formulaire de création -->
+                <div class="card" style="height: fit-content">
                   <h3><i class="fa-solid fa-plus"></i> Nouvelle Commande</h3>
                   <form id="order-form" onsubmit="createOrder(event)">
                     <div class="input-group mb-15">
-                      <label>Nom du Client</label
-                      ><input
+                      <label>Nom du Client</label>
+                      <input
                         type="text"
                         id="ord-client"
                         required
-                        placeholder="Ex: Jarl Balgruuf"
+                        placeholder="Ex: Forge Quartier Gris"
                       />
                     </div>
-                    <div class="form-row">
+
+                    <div
+                      class="form-row mb-15"
+                      style="display: grid; grid-template-columns: 1fr 1fr"
+                    >
                       <div class="input-group">
-                        <label>Marchandise</label>
-                        <select id="ord-item">
-                          <option value="Petit bois">Petit bois</option>
-                          <option value="Charbon Pauvre">Charbon Pauvre</option>
-                          <option value="Charbon Normale">
-                            Charbon Normale
-                          </option>
-                          <option value="Briquettes de Charbon">
-                            Briquettes de Charbon
-                          </option>
-                          <option value="Coke de charbon">
-                            Coke de charbon
-                          </option>
-                        </select>
+                        <label>Date de livraison</label>
+                        <input type="date" id="ord-deadline" />
                       </div>
                       <div class="input-group">
-                        <label>Quantité</label
-                        ><input
-                          type="number"
-                          id="ord-qty"
-                          value="10"
-                          min="1"
-                          required
-                        />
+                        <label>Heure (ex: 20h)</label>
+                        <input type="text" id="ord-time" placeholder="20h00" />
                       </div>
                     </div>
-                    <div class="form-row mb-15">
-                      <div class="input-group">
-                        <label>Prix Unitaire (S)</label
-                        ><input
-                          type="number"
-                          id="ord-price"
-                          step="0.01"
-                          value="1"
-                          required
-                        />
+
+                    <!-- Liste des articles -->
+                    <div
+                      style="
+                        border-top: 1px solid var(--border);
+                        padding-top: 15px;
+                        margin-bottom: 15px;
+                      "
+                    >
+                      <div
+                        style="
+                          display: flex;
+                          justify-content: space-between;
+                          align-items: center;
+                          margin-bottom: 10px;
+                        "
+                      >
+                        <label
+                          style="
+                            margin: 0;
+                            font-weight: bold;
+                            color: var(--primary);
+                          "
+                          >Articles commandés</label
+                        >
+                        <button
+                          type="button"
+                          class="btn-secondary"
+                          onclick="addOrderItemRow()"
+                          style="padding: 4px 8px; font-size: 0.8em"
+                        >
+                          <i class="fa-solid fa-plus"></i> Ajouter
+                        </button>
                       </div>
-                      <div class="input-group">
-                        <label>Date limite</label
-                        ><input type="date" id="ord-deadline" />
+                      <div id="order-items-container">
+                        <!-- Les lignes d'articles seront ajoutées ici par JS -->
                       </div>
                     </div>
+
+                    <!-- NOUVEAU : Champ de note -->
+                    <div class="input-group mb-15">
+                      <label>Note / Instructions (Optionnel)</label>
+                      <textarea
+                        id="ord-note"
+                        placeholder="Ex: Livrer à la forge, payer en avance..."
+                        style="
+                          width: 100%;
+                          padding: 10px;
+                          background: var(--bg-input);
+                          border: 1px solid var(--border);
+                          color: white;
+                          border-radius: 4px;
+                          font-family: &quot;Inter&quot;;
+                          resize: vertical;
+                          min-height: 60px;
+                        "
+                      ></textarea>
+                    </div>
+
                     <button type="submit" class="btn-primary">
                       Créer la commande
                     </button>
                   </form>
                 </div>
+
+                <!-- Liste des commandes -->
                 <div class="card">
                   <h3>Commandes en attente</h3>
-                  <div id="orders-container" class="orders-grid"></div>
+                  <div
+                    id="orders-container"
+                    class="orders-grid"
+                    style="grid-template-columns: 1fr"
+                  ></div>
                 </div>
               </div>
             </section>
