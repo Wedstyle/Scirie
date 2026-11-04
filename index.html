@@ -98,6 +98,11 @@
     <!-- APPLICATION PRINCIPALE -->
     <div id="app-screen" style="display: none">
       <header>
+        <!-- Bouton Burger (visible uniquement sur mobile) -->
+        <button class="burger-menu" onclick="toggleSidebar()">
+          <i class="fa-solid fa-bars"></i>
+        </button>
+
         <div class="logo"><i class="fa-solid fa-tree"></i> Scierie d'Anga</div>
         <div class="user-info">
           <span
@@ -112,8 +117,11 @@
         </div>
       </header>
 
+      <!-- Overlay sombre pour fermer le menu sur mobile -->
+      <div id="sidebar-overlay" onclick="toggleSidebar()"></div>
+
       <div class="layout">
-        <aside class="sidebar">
+        <aside class="sidebar" id="sidebar">
           <nav>
             <button
               class="nav-btn active"
@@ -170,6 +178,13 @@
             >
               <i class="fa-solid fa-crown"></i> Direction
             </button>
+            <button
+              class="nav-btn"
+              id="nav-logs"
+              onclick="switchTab('tab-logs', this)"
+            >
+              <i class="fa-solid fa-clipboard-list"></i> Journal d'Audit
+            </button>
           </nav>
         </aside>
 
@@ -178,7 +193,7 @@
             <!-- ONGLET COMMANDES -->
             <section id="tab-commandes" class="tab-content active">
               <h2 class="page-title">Bons de Commande</h2>
-              <div class="grid-layout" style="grid-template-columns: 400px 1fr">
+              <div class="grid-layout">
                 <div class="card" style="height: fit-content">
                   <h3><i class="fa-solid fa-plus"></i> Nouvelle Commande</h3>
                   <form id="order-form" onsubmit="createOrder(event)">
@@ -438,10 +453,7 @@
             <!-- ONGLET SAISIE DIRECTE -->
             <section id="tab-saisie" class="tab-content">
               <h2 class="page-title">Enregistrer une opération</h2>
-              <div
-                class="grid-layout-equal"
-                style="grid-template-columns: 350px 1fr"
-              >
+              <div class="grid-layout-equal">
                 <div class="card" style="height: fit-content">
                   <h3><i class="fa-solid fa-pen-nib"></i> Formulaire</h3>
                   <form id="employe-form" onsubmit="addTransaction(event)">
@@ -859,7 +871,42 @@
                         <tbody id="admin-history-body"></tbody>
                       </table>
                     </div>
+                    <!-- NOUVEAU : Bouton Voir Plus -->
+                    <div style="text-align: center; margin-top: 15px">
+                      <button
+                        id="btn-load-more"
+                        class="btn-secondary"
+                        onclick="loadMoreTransactions()"
+                        style="display: none; width: auto; margin: 0 auto"
+                      >
+                        Voir plus de transactions
+                      </button>
+                    </div>
                   </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- NOUVEL ONGLET : JOURNAL D'AUDIT -->
+            <section id="tab-logs" class="tab-content">
+              <h2 class="page-title">Journal d'Audit</h2>
+              <p style="color: var(--text-muted); margin-bottom: 15px">
+                Historique des actions sensibles (modifications de stock,
+                trésorerie, etc.).
+              </p>
+              <div class="card">
+                <div class="table-responsive">
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Utilisateur</th>
+                        <th>Action</th>
+                        <th>Détails</th>
+                      </tr>
+                    </thead>
+                    <tbody id="logs-body"></tbody>
+                  </table>
                 </div>
               </div>
             </section>

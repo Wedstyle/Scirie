@@ -1,21 +1,17 @@
 :root {
-  /* Palette Jeu Vidéo Dark Fantasy */
-  --bg-main: #121212; /* Roche sombre */
-  --bg-card: #1e1e24; /* Acier bleuté sombre */
-  --bg-input: #0a0a0c; /* Fissure noire */
-
-  --text-main: #e2e8f0; /* Blanc froid */
-  --text-muted: #94a3b8; /* Gris acier */
-
-  --primary: #d4af37; /* Or / Laiton */
+  --bg-main: #121212;
+  --bg-card: #1e1e24;
+  --bg-input: #0a0a0c;
+  --text-main: #e2e8f0;
+  --text-muted: #94a3b8;
+  --primary: #d4af37;
   --primary-hover: #f1c40f;
-  --success: #2e7d32; /* Vert forêt sombre */
-  --danger: #c62828; /* Rouge bordeaux */
-  --warning: #e67e22; /* Cuivre */
+  --success: #2e7d32;
+  --danger: #c62828;
+  --warning: #e67e22;
   --purple: #6a4c93;
-
-  --border: #33333d; /* Bordure métallique */
-  --radius: 4px; /* Angles droits, style forgé */
+  --border: #33333d;
+  --radius: 4px;
 }
 
 * {
@@ -23,7 +19,6 @@
   margin: 0;
   padding: 0;
 }
-
 body {
   background-color: var(--bg-main);
   background-image: radial-gradient(circle at 50% 0%, #1a1a20 0%, #121212 100%);
@@ -35,7 +30,6 @@ body {
   font-family: "Inter", sans-serif;
   font-size: 14px;
 }
-
 h1,
 h2,
 h3,
@@ -49,47 +43,7 @@ h4,
   letter-spacing: 0.5px;
 }
 
-/* =========================================
-   ANIMATIONS GLOBALES
-   ========================================= */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-@keyframes pulse {
-  0% {
-    transform: scale(1);
-    opacity: 1;
-  }
-  50% {
-    transform: scale(1.05);
-    opacity: 0.7;
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-@keyframes popIn {
-  0% {
-    transform: scale(0.9);
-    opacity: 0;
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-
-/* =========================================
-   AUTHENTIFICATION
-   ========================================= */
+/* --- UI HELPERS --- */
 .full-screen {
   display: flex;
   justify-content: center;
@@ -107,18 +61,11 @@ h4,
   border-top: 3px solid var(--primary);
   text-align: center;
   box-shadow: 0 15px 40px rgba(0, 0, 0, 0.8);
-  animation: fadeIn 0.6s ease-out;
-  transition: transform 0.3s ease;
 }
-.auth-box:hover {
-  transform: translateY(-2px);
-}
-
 .auth-logo {
   font-size: 3em;
   color: var(--primary);
   margin-bottom: 15px;
-  text-shadow: 0 0 15px rgba(212, 175, 55, 0.3);
 }
 .auth-box h1 {
   color: var(--primary);
@@ -138,7 +85,6 @@ h4,
   text-transform: uppercase;
   letter-spacing: 2px;
 }
-
 .input-group {
   position: relative;
   margin-bottom: 15px;
@@ -154,7 +100,8 @@ h4,
   transition: 0.3s;
 }
 .input-group input,
-.input-group select {
+.input-group select,
+.input-group textarea {
   width: 100%;
   padding: 12px 15px 12px 40px;
   background: var(--bg-input);
@@ -162,20 +109,14 @@ h4,
   color: var(--text-main);
   border-radius: var(--radius);
   outline: none;
-  transition: all 0.3s ease;
+  transition: 0.2s;
   font-size: 0.95em;
   font-family: "Inter", sans-serif;
 }
 .input-group input:focus,
 .input-group select:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 10px rgba(212, 175, 55, 0.1);
-  background: #000;
 }
-.input-group input:focus + i {
-  color: var(--primary);
-}
-
 .input-group label {
   display: block;
   font-size: 0.85em;
@@ -192,16 +133,12 @@ h4,
   color: var(--primary);
   text-decoration: none;
   font-weight: 600;
-  transition: 0.2s;
 }
 .toggle-text a:hover {
   text-decoration: underline;
-  text-shadow: 0 0 10px rgba(212, 175, 55, 0.5);
 }
 
-/* =========================================
-   BOUTONS & INTERACTIONS
-   ========================================= */
+/* Boutons */
 .btn-primary {
   background: transparent;
   color: var(--primary);
@@ -211,36 +148,13 @@ h4,
   cursor: pointer;
   font-weight: 700;
   width: 100%;
-  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  transition: 0.3s;
   font-size: 1em;
-  position: relative;
-  overflow: hidden;
-}
-.btn-primary::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 300%;
-  height: 300%;
-  background: rgba(212, 175, 55, 0.1);
-  border-radius: 50%;
-  transform: translate(-50%, -50%) scale(0);
-  transition: transform 0.5s ease;
 }
 .btn-primary:hover {
   background: var(--primary);
   color: #111;
-  box-shadow: 0 0 15px rgba(212, 175, 55, 0.4);
-  transform: translateY(-2px);
 }
-.btn-primary:active {
-  transform: scale(0.97);
-}
-.btn-primary:hover::after {
-  transform: translate(-50%, -50%) scale(1);
-}
-
 .btn-secondary {
   background: transparent;
   color: var(--text-main);
@@ -248,38 +162,30 @@ h4,
   padding: 12px 20px;
   border-radius: var(--radius);
   cursor: pointer;
-  transition: all 0.3s;
+  transition: 0.2s;
   font-weight: 600;
   font-family: "Cinzel";
 }
 .btn-secondary:hover {
   background: var(--border);
-  transform: translateY(-2px);
 }
-.btn-secondary:active {
-  transform: scale(0.97);
-}
-
 .btn-icon {
   background: none;
   border: none;
   color: var(--text-muted);
   font-size: 1.2em;
   cursor: pointer;
-  transition: 0.3s;
+  transition: 0.2s;
   padding: 8px;
 }
 .btn-icon:hover {
   color: var(--danger);
-  transform: rotate(90deg) scale(1.1);
 }
 
-/* =========================================
-   HEADER & SIDEBAR
-   ========================================= */
+/* Header */
 header {
   background: var(--bg-card);
-  padding: 0 30px;
+  padding: 0 20px;
   height: 70px;
   display: flex;
   justify-content: space-between;
@@ -310,9 +216,22 @@ header {
   font-size: 0.75em;
 }
 
+/* Bouton Burger (Caché par défaut) */
+.burger-menu {
+  display: none;
+  background: none;
+  border: none;
+  color: var(--primary);
+  font-size: 1.5em;
+  cursor: pointer;
+  margin-right: 15px;
+}
+
+/* Layout */
 .layout {
   display: flex;
   height: calc(100vh - 70px);
+  position: relative;
 }
 .sidebar {
   width: 250px;
@@ -321,6 +240,8 @@ header {
   padding: 15px 0;
   display: flex;
   flex-direction: column;
+  transition: transform 0.3s ease-in-out;
+  z-index: 100;
 }
 .sidebar nav {
   display: flex;
@@ -335,7 +256,7 @@ header {
   text-align: left;
   font-size: 0.95em;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: 0.2s;
   display: flex;
   align-items: center;
   gap: 15px;
@@ -344,7 +265,6 @@ header {
 .nav-btn:hover {
   color: var(--text-main);
   background: rgba(255, 255, 255, 0.02);
-  transform: translateX(5px);
 }
 .nav-btn.active {
   color: var(--primary);
@@ -356,14 +276,25 @@ header {
   text-align: center;
 }
 
-/* =========================================
-   CONTENU & CARTES
-   ========================================= */
+/* Overlay sombre pour fermer le menu sur mobile */
+#sidebar-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(2px);
+  z-index: 99;
+  display: none;
+}
+
+/* Contenu */
 .content {
   flex: 1;
   padding: 30px;
   overflow-y: auto;
-  scroll-behavior: smooth;
+  min-width: 0;
 }
 .content-inner {
   max-width: 1400px;
@@ -377,15 +308,25 @@ header {
   border-bottom: 1px solid var(--border);
   padding-bottom: 10px;
 }
-
 .tab-content {
   display: none;
-  animation: fadeIn 0.4s ease;
 }
 .tab-content.active {
   display: block;
+  animation: fadeIn 0.4s ease;
+}
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
+/* Cartes */
 .card {
   background: var(--bg-card);
   padding: 24px;
@@ -393,13 +334,6 @@ header {
   border: 1px solid var(--border);
   margin-bottom: 24px;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
-  transition:
-    border-color 0.3s,
-    box-shadow 0.3s;
-}
-.card:hover {
-  border-color: #44444f;
-  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.4);
 }
 .card h3 {
   font-size: 1.1em;
@@ -411,7 +345,6 @@ header {
   border-bottom: 1px solid var(--border);
   padding-bottom: 12px;
 }
-
 .grid-layout {
   display: grid;
   grid-template-columns: 350px 1fr;
@@ -431,9 +364,7 @@ header {
   gap: 24px;
 }
 
-/* =========================================
-   FORMULAIRES & TABLEAUX
-   ========================================= */
+/* Formulaires & Tableaux */
 .form-row {
   display: flex;
   gap: 15px;
@@ -457,7 +388,6 @@ header {
 .mt-15 {
   margin-top: 15px;
 }
-
 .table-responsive {
   overflow-x: auto;
   border-radius: var(--radius);
@@ -473,7 +403,6 @@ header {
   padding: 12px 15px;
   text-align: left;
   border-bottom: 1px solid var(--border);
-  transition: background 0.2s;
 }
 .data-table th {
   background: var(--bg-input);
@@ -482,16 +411,30 @@ header {
   font-weight: 600;
   font-size: 0.85em;
 }
-.data-table tr {
-  transition: background 0.2s;
-}
 .data-table tr:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.02);
+}
+.badge-type {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.8em;
+  font-weight: 700;
+  display: inline-block;
+}
+.text-success {
+  color: var(--success);
+  font-weight: 700;
+}
+.text-danger {
+  color: var(--danger);
+  font-weight: 700;
+}
+.bg-purple {
+  background-color: var(--purple);
+  color: white;
 }
 
-/* =========================================
-   STATISTIQUES
-   ========================================= */
+/* Stats & Graphiques */
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -505,13 +448,6 @@ header {
   text-align: center;
   background: var(--bg-card);
   border-top: 2px solid;
-  transition:
-    transform 0.3s,
-    box-shadow 0.3s;
-}
-.stat-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.4);
 }
 .bg-green {
   border-top-color: var(--success);
@@ -522,7 +458,6 @@ header {
 .bg-orange {
   border-top-color: var(--warning);
 }
-
 .stat-card h3 {
   font-size: 0.85em;
   margin-bottom: 10px;
@@ -544,10 +479,6 @@ header {
 .bg-orange p {
   color: var(--warning);
 }
-
-/* =========================================
-   GRAPHIQUES (CORRIGÉS ET CENTRÉS)
-   ========================================= */
 .charts-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -559,20 +490,17 @@ header {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center; /* Centre le contenu verticalement */
+  justify-content: center;
   position: relative;
   overflow: hidden;
 }
-/* Force le canvas à respecter la taille de la carte */
 .chart-card canvas {
   max-height: 250px !important;
   max-width: 250px !important;
   margin: 0 auto;
 }
 
-/* =========================================
-   LOCATIONS (TONNEAUX & FOURS)
-   ========================================= */
+/* Cartes Tonneaux/Fours */
 .barrels-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -587,12 +515,6 @@ header {
   justify-content: space-between;
   border: 1px solid var(--border);
   border-left: 3px solid var(--primary);
-  transition: all 0.3s ease;
-}
-.barrel-card:hover {
-  transform: translateY(-4px) scale(1.01);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
-  border-color: #444;
 }
 .barrel-card.free {
   border-left-color: var(--success);
@@ -602,20 +524,7 @@ header {
 }
 .barrel-card.late {
   border-left-color: var(--danger);
-  animation: pulseBorder 2s infinite;
 }
-@keyframes pulseBorder {
-  0% {
-    border-color: var(--danger);
-  }
-  50% {
-    border-color: #ff6b6b;
-  }
-  100% {
-    border-color: var(--danger);
-  }
-}
-
 .barrel-header {
   display: flex;
   justify-content: space-between;
@@ -648,11 +557,6 @@ header {
   color: var(--danger);
   border-color: var(--danger);
 }
-
-.barrel-body {
-  flex-grow: 1;
-  margin-bottom: 20px;
-}
 .client-name {
   font-size: 1em;
   color: var(--text-main);
@@ -673,7 +577,6 @@ header {
 .barrel-card.late .next-pay-date {
   color: var(--danger);
 }
-
 .barrel-actions {
   display: flex;
   flex-direction: column;
@@ -689,14 +592,6 @@ header {
   font-family: "Cinzel";
   font-size: 0.85em;
   background: transparent;
-  transition: all 0.2s ease;
-}
-.barrel-actions button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
-}
-.barrel-actions button:active {
-  transform: scale(0.96);
 }
 .btn-pay {
   color: var(--success);
@@ -723,9 +618,7 @@ header {
   color: #111;
 }
 
-/* =========================================
-   PERSONNEL & COMMANDES
-   ========================================= */
+/* Personnel, Commandes, Stock */
 .personnel-row {
   display: flex;
   justify-content: space-between;
@@ -735,26 +628,10 @@ header {
   border-radius: 4px;
   margin-bottom: 10px;
   border: 1px solid var(--border);
-  transition: 0.2s;
   cursor: pointer;
 }
 .personnel-row:hover {
   border-color: var(--primary);
-  background: rgba(255, 255, 255, 0.03);
-  transform: translateX(3px);
-}
-.personnel-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.personnel-info strong {
-  font-size: 1em;
-  font-family: "Cinzel";
-}
-.personnel-info span {
-  font-size: 0.85em;
-  color: var(--text-muted);
 }
 .personnel-actions {
   display: flex;
@@ -768,46 +645,23 @@ header {
   cursor: pointer;
   font-weight: 700;
   font-family: "Cinzel";
-  transition: 0.2s;
   font-size: 0.85em;
-}
-.btn-action:hover {
-  transform: scale(1.05);
 }
 .btn-validate {
   color: var(--success);
   border-color: var(--success);
 }
-.btn-validate:hover {
-  background: var(--success);
-  color: #fff;
-  box-shadow: 0 0 10px rgba(46, 125, 50, 0.5);
-}
 .btn-promote {
   color: var(--warning);
   border-color: var(--warning);
-}
-.btn-promote:hover {
-  background: var(--warning);
-  color: #111;
-  box-shadow: 0 0 10px rgba(230, 126, 34, 0.5);
 }
 .btn-fire {
   color: var(--danger);
   border-color: var(--danger);
 }
-.btn-fire:hover {
-  background: var(--danger);
-  color: #fff;
-  box-shadow: 0 0 10px rgba(198, 40, 40, 0.5);
-}
 .btn-contremaitre {
-  color: #64b5f6;
-  border-color: #64b5f6;
-}
-.btn-contremaitre:hover {
-  background: #64b5f6;
-  color: #111;
+  color: #3498db;
+  border-color: #3498db;
 }
 
 .orders-grid {
@@ -824,13 +678,6 @@ header {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  transition:
-    transform 0.3s,
-    box-shadow 0.3s;
-}
-.order-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.4);
 }
 .order-card h4 {
   color: var(--primary);
@@ -841,11 +688,6 @@ header {
   font-size: 0.9em;
   color: var(--text-muted);
   margin-bottom: 15px;
-}
-.order-card .details span {
-  display: block;
-  font-size: 0.9em;
-  margin-bottom: 5px;
 }
 .order-card .actions {
   display: flex;
@@ -862,31 +704,16 @@ header {
   font-family: "Cinzel";
   font-size: 0.85em;
   background: transparent;
-  transition: all 0.2s;
-}
-.order-card button:hover {
-  transform: translateY(-2px);
 }
 .btn-honor {
   color: var(--success);
   border-color: var(--success);
 }
-.btn-honor:hover {
-  background: var(--success);
-  color: #fff;
-}
 .btn-cancel {
   color: var(--danger);
   border-color: var(--danger);
 }
-.btn-cancel:hover {
-  background: var(--danger);
-  color: #fff;
-}
 
-/* =========================================
-   STOCK & SALAIRES
-   ========================================= */
 .stock-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
@@ -901,17 +728,11 @@ header {
   border-top: 2px solid var(--primary);
   display: flex;
   flex-direction: column;
-  transition: transform 0.3s;
-}
-.stock-item:hover {
-  transform: translateY(-3px);
-  border-top-color: var(--primary-hover);
 }
 .stock-item h4 {
   font-size: 1em;
   margin-bottom: 12px;
   padding: 6px;
-  color: var(--text-main);
   font-family: "Cinzel";
 }
 .stock-item .qty {
@@ -938,11 +759,6 @@ header {
   color: var(--text-main);
   outline: none;
   border-radius: 4px;
-  font-family: "Inter";
-  transition: border 0.3s;
-}
-.stock-controls input:focus {
-  border-color: var(--primary);
 }
 .stock-buttons {
   display: flex;
@@ -958,25 +774,14 @@ header {
   background: transparent;
   border-radius: 4px;
   font-family: "Cinzel";
-  transition: 0.2s;
 }
 .btn-add {
   color: var(--success);
   border-color: var(--success);
 }
-.btn-add:hover {
-  background: var(--success);
-  color: #fff;
-  transform: scale(1.02);
-}
 .btn-sub {
   color: var(--danger);
   border-color: var(--danger);
-}
-.btn-sub:hover {
-  background: var(--danger);
-  color: #fff;
-  transform: scale(1.02);
 }
 
 .salary-row {
@@ -988,14 +793,6 @@ header {
   border-radius: 4px;
   margin-bottom: 10px;
   border: 1px solid var(--border);
-  transition: 0.2s;
-}
-.salary-row:hover {
-  border-color: #444;
-}
-.salary-row span {
-  font-weight: 600;
-  font-size: 0.95em;
 }
 .salary-row input {
   width: 100px;
@@ -1005,18 +802,11 @@ header {
   color: var(--warning);
   text-align: right;
   font-weight: 700;
-  outline: none;
   border-radius: 4px;
-  font-family: "Inter";
-  transition: border 0.3s;
-}
-.salary-row input:focus {
-  border-color: var(--warning);
 }
 .salary-total-box {
   display: flex;
   justify-content: space-between;
-  align-items: center;
   padding: 15px;
   background: rgba(230, 126, 34, 0.1);
   border: 1px solid var(--warning);
@@ -1029,22 +819,16 @@ header {
   border: 1px solid var(--purple);
   color: #cdb4db;
   padding: 12px;
-  font-size: 1em;
   display: flex;
   justify-content: center;
-  align-items: center;
   gap: 8px;
-  transition: all 0.3s;
 }
 .btn-pay-salary:hover {
   background: var(--purple);
   color: #fff;
-  box-shadow: 0 0 15px rgba(106, 76, 147, 0.5);
 }
 
-/* =========================================
-   MODALES & ANIMATIONS DE VALIDATION
-   ========================================= */
+/* États vides */
 .empty-state {
   display: flex;
   flex-direction: column;
@@ -1062,12 +846,9 @@ header {
   margin-bottom: 15px;
   opacity: 0.3;
   color: var(--primary);
-  animation: pulse 3s infinite;
-}
-.empty-state p {
-  font-size: 0.95em;
 }
 
+/* Modales */
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -1079,7 +860,6 @@ header {
   justify-content: center;
   align-items: center;
   z-index: 1000;
-  backdrop-filter: blur(3px);
 }
 .modal-box {
   background: var(--bg-card);
@@ -1090,141 +870,27 @@ header {
   max-width: 450px;
   width: 90%;
   text-align: center;
-  box-shadow: 0 15px 50px rgba(0, 0, 0, 0.9);
-  animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 .modal-box h3 {
   color: var(--primary);
   margin-bottom: 15px;
-  font-size: 1.3em;
 }
 .modal-box p {
   margin-bottom: 25px;
   color: var(--text-muted);
   font-size: 0.95em;
-  line-height: 1.5;
-}
-/* =========================================
-   TABLEAU DES PRIX (PAGE SAISIE)
-   ========================================= */
-.price-section {
-  background: rgba(0, 0, 0, 0.2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 15px;
 }
 
-.section-title {
-  font-family: "Cinzel", serif;
-  font-size: 1.1em;
-  margin-bottom: 12px;
-  padding-bottom: 8px;
-  border-bottom: 2px solid;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
-
-.price-table {
-  background: transparent !important;
-  border: none !important;
-}
-
-.price-table th {
-  background: rgba(255, 255, 255, 0.03) !important;
-  font-size: 0.8em !important;
-  padding: 8px 10px !important;
-  text-align: center !important;
-}
-
-.price-table td {
-  padding: 8px 10px !important;
-  text-align: center !important;
-  font-size: 0.95em;
-  border-bottom: 1px dashed rgba(255, 255, 255, 0.05) !important;
-}
-
-/* On enlève la bordure du dernier rang */
-.price-table tr:last-child td {
-  border-bottom: none !important;
-}
-
-/* Style des prix */
-.text-success {
-  color: var(--success);
-  font-weight: 700;
-  font-family: "Cinzel";
-  font-size: 1.05em;
-}
-.text-warning {
-  color: var(--warning);
-  font-weight: 700;
-  font-family: "Cinzel";
-  font-size: 1.05em;
-}
-.text-danger {
-  color: var(--danger);
-  font-weight: 700;
-  font-family: "Cinzel";
-  font-size: 1.05em;
-}
-/* --- CHAMP DIVERS (PAGE SAISIE) --- */
-#custom-item-row {
-  animation: fadeIn 0.3s ease-out;
-}
-
-#emp-custom-item {
-  border-color: var(--primary) !important;
-  background: rgba(212, 175, 55, 0.05) !important;
-}
-
-#emp-custom-item:focus {
-  box-shadow: 0 0 10px rgba(212, 175, 55, 0.3) !important;
-}
-/* --- BOÎTE DE PRIX DU TONNEAU --- */
-.barrel-price-container {
+/* Toasts */
+#toast-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 9999;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: rgba(0, 0, 0, 0.3); /* Même fond sombre que la trésorerie */
-  padding: 6px 12px;
-  border-radius: 4px;
-  border: 1px solid var(--border);
-  margin-bottom: 12px;
-  transition:
-    border-color 0.3s,
-    box-shadow 0.3s;
-  cursor: text;
+  flex-direction: column;
+  gap: 10px;
 }
-
-.barrel-price-container:hover {
-  border-color: var(--primary);
-  box-shadow: 0 0 8px rgba(212, 175, 55, 0.1);
-}
-
-/* On cache les petites flèches du champ number */
-.barrel-price-input {
-  background: transparent;
-  border: none;
-  color: var(--primary);
-  font-family: "Cinzel", serif;
-  font-size: 1.1em;
-  font-weight: 700;
-  width: 50px;
-  text-align: right;
-  outline: none;
-}
-
-.barrel-price-input::-webkit-outer-spin-button,
-.barrel-price-input::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-.barrel-price-input[type="number"] {
-  -moz-appearance: textfield;
-}
-/* =========================================
-   NOTIFICATIONS TOASTS
-   ========================================= */
 .toast {
   background: var(--bg-card);
   color: var(--text-main);
@@ -1234,60 +900,31 @@ header {
   display: flex;
   align-items: center;
   gap: 12px;
-  font-family: "Inter", sans-serif;
   font-size: 0.95em;
   min-width: 250px;
-  max-width: 350px;
   border-left: 4px solid var(--primary);
   animation: slideIn 0.3s ease-out forwards;
   opacity: 0;
   transform: translateX(100%);
 }
-
 .toast.hiding {
   animation: slideOut 0.3s ease-in forwards;
 }
-
-/* Couleurs selon le type de notification */
 .toast-success {
   border-left-color: var(--success);
 }
-.toast-success i {
-  color: var(--success);
-}
-
 .toast-warning {
   border-left-color: var(--warning);
 }
-.toast-warning i {
-  color: var(--warning);
-}
-
 .toast-danger {
   border-left-color: var(--danger);
 }
-.toast-danger i {
-  color: var(--danger);
-}
-
-.toast-info {
-  border-left-color: var(--primary);
-}
-.toast-info i {
-  color: var(--primary);
-}
-
-.toast i {
-  font-size: 1.2em;
-}
-
 @keyframes slideIn {
   to {
     opacity: 1;
     transform: translateX(0);
   }
 }
-
 @keyframes slideOut {
   to {
     opacity: 0;
@@ -1295,36 +932,115 @@ header {
   }
 }
 
-/* =========================================
-   BADGE COMPTEUR COMMANDES
-   ========================================= */
-#orders-count {
-  animation: pulseBadge 2s infinite;
+/* Prix Tableaux */
+.price-section {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 15px;
+}
+.section-title {
+  font-family: "Cinzel";
+  font-size: 1.1em;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid;
+  text-transform: uppercase;
+}
+.price-table {
+  background: transparent !important;
+  border: none !important;
+}
+.price-table th {
+  background: rgba(255, 255, 255, 0.03) !important;
+  text-align: center !important;
+}
+.price-table td {
+  text-align: center !important;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.05) !important;
 }
 
-@keyframes pulseBadge {
-  0% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.1);
-  }
-  100% {
-    transform: scale(1);
-  }
-}
 /* =========================================
-   BADGES DE RESSOURCES
+   RESPONSIVE (MOBILE & TABLETTE)
    ========================================= */
-.badge-type {
-  padding: 6px 12px;
-  border-radius: 4px; /* Bords légèrement arrondis */
-  font-weight: 700;
-  font-size: 0.85em;
-  display: inline-block;
-  font-family: "Inter", sans-serif;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); /* Petite ombre pour décoller du fond */
-  border: 1px solid rgba(255, 255, 255, 0.1); /* Bordure très fine */
-  text-align: center;
-  min-width: 100px; /* Largeur minimale pour que ce soit régulier */
+@media (max-width: 1024px) {
+  /* Grilles en 1 colonne */
+  .grid-layout,
+  .grid-layout-equal,
+  .charts-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .stats-grid {
+    grid-template-columns: 1fr 1fr;
+  } /* 2 cartes par ligne sur tablette */
+}
+
+@media (max-width: 768px) {
+  /* Header */
+  .burger-menu {
+    display: block;
+  } /* On affiche le bouton burger */
+  .logo {
+    font-size: 1.1em;
+  }
+  .user-info span:first-child {
+    display: none;
+  } /* On cache le nom complet pour gagner de la place */
+
+  /* Sidebar (Menu glissant) */
+  .sidebar {
+    position: fixed;
+    top: 70px;
+    left: -260px;
+    height: calc(100vh - 70px);
+    box-shadow: 5px 0 15px rgba(0, 0, 0, 0.5);
+  }
+  .sidebar.open {
+    transform: translateX(260px);
+  } /* Fait glisser le menu */
+  #sidebar-overlay {
+    display: block;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+  }
+  #sidebar-overlay.active {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* Contenu principal */
+  .content {
+    padding: 15px;
+  }
+  .page-title {
+    font-size: 1.3em;
+  }
+  .stats-grid {
+    grid-template-columns: 1fr;
+  } /* 1 seule carte par ligne sur mobile */
+  .card {
+    padding: 15px;
+  }
+
+  /* Ajustements des tableaux pour mobile */
+  .data-table th,
+  .data-table td {
+    padding: 8px 10px;
+    font-size: 0.85em;
+  }
+
+  /* Ajustement du formulaire de commande */
+  .order-item-row {
+    flex-wrap: wrap;
+  }
+  .order-item-select {
+    width: 100% !important;
+    flex: none !important;
+  }
+  .order-item-qty,
+  .order-item-price {
+    flex: 1 !important;
+    width: auto !important;
+  }
 }

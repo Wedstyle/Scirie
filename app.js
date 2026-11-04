@@ -11,7 +11,8 @@ let chartVentesInstance = null;
 let currentPeriod = "all";
 let currentBarrelToAllocate = null;
 let realtimeChannel = null;
-let currentOrders = []; // Stockage global des commandes pour la modification
+let currentOrders = [];
+let transactionLimit = 50; // Pagination : on charge 50 transactions par défaut
 
 const basePricesVente = {
   "Petit bois": 0.2,
@@ -91,6 +92,18 @@ function switchTab(tabId, btnElement) {
     .forEach((btn) => btn.classList.remove("active"));
   document.getElementById(tabId).classList.add("active");
   if (btnElement) btnElement.classList.add("active");
+  // Fermer le menu mobile lors d'un changement d'onglet
+  if (window.innerWidth <= 768) closeSidebar();
+}
+
+// Menu Burger Mobile
+function toggleSidebar() {
+  document.getElementById("sidebar").classList.toggle("open");
+  document.getElementById("sidebar-overlay").classList.toggle("active");
+}
+function closeSidebar() {
+  document.getElementById("sidebar").classList.remove("open");
+  document.getElementById("sidebar-overlay").classList.remove("active");
 }
 
 function updateOrdersCount(count) {
@@ -106,53 +119,86 @@ function updateOrdersCount(count) {
 }
 
 // ==========================================
+// --- GESTION DES LOGS (AUDIT) ---
+// ==========================================
+async function addLog(actionType, details) {
+  if (!userProfile) return;
+  await db.from("logs").insert({
+    user_name: userProfile.full_name,
+    action_type: actionType,
+    details: details,
+  });
+}
+
+async function loadLogs() {
+  const tbody = document.getElementById("logs-body");
+  if (!tbody) return;
+  tbody.innerHTML =
+    '<tr><td colspan="4" class="text-center">Chargement...</td></tr>';
+
+  const { data: logs } = await db
+    .from("logs")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(100);
+
+  if (logs && logs.length > 0) {
+    tbody.innerHTML = "";
+    logs.forEach((log) => {
+      tbody.innerHTML += `
+                <tr>
+                    <td>${new Date(log.created_at).toLocaleString("fr-FR")}</td>
+                    <td><strong>${log.user_name}</strong></td>
+                    <td><span class="badge-type bg-blue" style="background:#3b82f6; color:white;">${log.action_type}</span></td>
+                    <td>${log.details}</td>
+                </tr>
+            `;
+    });
+  } else {
+    tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state"><p>Aucun log pour le moment.</p></div></td></tr>`;
+  }
+}
+
+// ==========================================
+// --- PAGINATION ---
+// ==========================================
+function loadMoreTransactions() {
+  transactionLimit += 50;
+  loadPatronData();
+}
+
+// ==========================================
 // --- GESTION DES COMMANDES MULTIPLES ---
 // ==========================================
 function addOrderItemRow() {
   const container = document.getElementById("order-items-container");
   if (!container) return;
-
   const row = document.createElement("div");
   row.className = "order-item-row";
   row.style.display = "flex";
   row.style.gap = "8px";
   row.style.alignItems = "center";
   row.style.marginBottom = "8px";
-
   row.innerHTML = `
         <select class="order-item-select" onchange="updateOrderItemPrice(this)" style="flex: 2; min-width: 80px; padding: 8px; background: var(--bg-input); border: 1px solid var(--border); color: white; border-radius: 4px;">
-            <option value="Petit bois">Petit bois</option>
-            <option value="Charbon Pauvre">Charbon Pauvre</option>
-            <option value="Charbon Normale">Charbon Normale</option>
-            <option value="Briquettes de Charbon">Briquettes de Charbon</option>
-            <option value="Coke de charbon">Coke de charbon</option>
+            <option value="Petit bois">Petit bois</option><option value="Charbon Pauvre">Charbon Pauvre</option><option value="Charbon Normale">Charbon Normale</option><option value="Briquettes de Charbon">Briquettes de Charbon</option><option value="Coke de charbon">Coke de charbon</option>
         </select>
         <input type="number" class="order-item-qty" placeholder="Qté" min="1" value="1" style="width: 50px; padding: 8px; background: var(--bg-input); border: 1px solid var(--border); color: white; border-radius: 4px;">
         <input type="number" class="order-item-price" placeholder="Prix" step="0.01" value="0.2" style="width: 60px; padding: 8px; background: var(--bg-input); border: 1px solid var(--border); color: white; border-radius: 4px;">
-        <button type="button" onclick="this.parentElement.remove()" style="background: transparent; border: 1px solid var(--danger); color: var(--danger); padding: 8px 10px; cursor: pointer; border-radius: 4px; display: flex; align-items: center; justify-content: center;">
-            <i class="fa-solid fa-trash"></i>
-        </button>
+        <button type="button" onclick="this.parentElement.remove()" style="background: transparent; border: 1px solid var(--danger); color: var(--danger); padding: 8px 10px; cursor: pointer; border-radius: 4px;"><i class="fa-solid fa-trash"></i></button>
     `;
   container.appendChild(row);
   updateOrderItemPrice(row.querySelector(".order-item-select"));
 }
-
 function updateOrderItemPrice(selectElement) {
   const priceInput =
     selectElement.parentElement.querySelector(".order-item-price");
-  const item = selectElement.value;
-  priceInput.value = basePricesVente[item] || 1;
+  priceInput.value = basePricesVente[selectElement.value] || 1;
 }
-
 document.addEventListener("DOMContentLoaded", () => {
-  if (document.getElementById("order-items-container")) {
-    addOrderItemRow();
-  }
+  if (document.getElementById("order-items-container")) addOrderItemRow();
 });
 
-// ==========================================
-// --- GESTION DES COMMANDES (CRÉATION & MODIFICATION) ---
-// ==========================================
 async function createOrder(e) {
   e.preventDefault();
   const client_name = document.getElementById("ord-client").value.trim();
@@ -160,35 +206,27 @@ async function createOrder(e) {
   const delivery_time =
     document.getElementById("ord-time").value.trim() || null;
   const note = document.getElementById("ord-note").value.trim() || null;
-
   const rows = document.querySelectorAll(".order-item-row");
   let items = [];
-
   rows.forEach((row) => {
     const item_type = row.querySelector(".order-item-select").value;
     const quantity = parseFloat(row.querySelector(".order-item-qty").value);
     const unit_price = parseFloat(row.querySelector(".order-item-price").value);
-
-    if (quantity > 0) {
-      items.push({ item_type, quantity, unit_price });
-    }
+    if (quantity > 0) items.push({ item_type, quantity, unit_price });
   });
-
   if (items.length === 0)
-    return showPopup(
-      "Erreur",
-      "Veuillez ajouter au moins un article avec une quantité > 0.",
-    );
+    return showPopup("Erreur", "Veuillez ajouter au moins un article.");
 
-  const { error } = await db.from("orders").insert({
-    client_name,
-    items,
-    delivery_time,
-    deadline,
-    note,
-    created_by: currentUser.id,
-  });
-
+  const { error } = await db
+    .from("orders")
+    .insert({
+      client_name,
+      items,
+      delivery_time,
+      deadline,
+      note,
+      created_by: currentUser.id,
+    });
   if (error) showPopup("Erreur", error.message);
   else {
     showToast("Commande créée !", "success");
@@ -207,8 +245,7 @@ async function loadOrders() {
     .order("created_at", { ascending: true });
   const container = document.getElementById("orders-container");
   if (!container) return;
-
-  currentOrders = orders || []; // Sauvegarde pour la modification
+  currentOrders = orders || [];
   updateOrdersCount(orders ? orders.length : 0);
 
   if (orders && orders.length > 0) {
@@ -226,7 +263,6 @@ async function loadOrders() {
           ];
         else orderItems = [];
       }
-
       let itemsHtml = "";
       let totalGeneral = 0;
       let maxDate = o.deadline
@@ -234,50 +270,30 @@ async function loadOrders() {
         : "Non spécifiée";
       let timeStr = o.delivery_time ? ` à ${o.delivery_time}` : "";
       let noteHtml = o.note
-        ? `<div style="margin-top: 10px; padding: 8px; background: rgba(212, 175, 55, 0.1); border-left: 3px solid var(--primary); font-size: 0.85em; font-style: italic; color: var(--text-main);"><i class="fa-solid fa-note-sticky"></i> Note : ${o.note}</div>`
+        ? `<div style="margin-top: 10px; padding: 8px; background: rgba(212, 175, 55, 0.1); border-left: 3px solid var(--primary); font-size: 0.85em; font-style: italic;"><i class="fa-solid fa-note-sticky"></i> Note : ${o.note}</div>`
         : "";
 
       orderItems.forEach((item) => {
         const cost = item.quantity * item.unit_price;
         totalGeneral += cost;
-        const color = typeColors[item.item_type] || "#888";
-        itemsHtml += `
-                    <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed var(--border); padding: 5px 0; font-size: 0.9em;">
-                        <span><strong style="color: ${color};">${item.quantity}x</strong> ${item.item_type}</span>
-                        <span style="color: var(--text-muted);">(${parseFloat(item.unit_price).toFixed(2)} S/u)</span>
-                    </div>
-                `;
+        itemsHtml += `<div style="display: flex; justify-content: space-between; border-bottom: 1px dashed var(--border); padding: 5px 0; font-size: 0.9em;"><span><strong style="color: ${typeColors[item.item_type] || "#888"};">${item.quantity}x</strong> ${item.item_type}</span><span style="color: var(--text-muted);">(${parseFloat(item.unit_price).toFixed(2)} S/u)</span></div>`;
       });
 
       container.innerHTML += `
                 <div class="order-card" style="border-left-color: var(--primary); padding: 15px; margin-bottom: 15px;">
-                    <div style="margin-bottom: 10px;">
-                        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                            <h4 style="margin: 0; color: var(--primary);">${o.client_name}</h4>
-                            <span style="background: rgba(255,255,255,0.1); padding: 2px 8px; border-radius: 4px; font-size: 0.8em;"><i class="fa-regular fa-clock"></i> ${maxDate}${timeStr}</span>
-                        </div>
+                    <div style="margin-bottom: 10px; display: flex; justify-content: space-between; align-items: flex-start;">
+                        <h4 style="margin: 0; color: var(--primary);">${o.client_name}</h4>
+                        <span style="background: rgba(255,255,255,0.1); padding: 2px 8px; border-radius: 4px; font-size: 0.8em;"><i class="fa-regular fa-clock"></i> ${maxDate}${timeStr}</span>
                     </div>
-                    
                     <div style="margin-bottom: 15px; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 4px;">
                         ${itemsHtml}
-                        <div style="display: flex; justify-content: space-between; margin-top: 10px; font-weight: bold; font-family: 'Cinzel';">
-                            <span>TOTAL :</span>
-                            <span style="color: var(--success);">${Math.round(totalGeneral)} S</span>
-                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-top: 10px; font-weight: bold; font-family: 'Cinzel';"><span>TOTAL :</span><span style="color: var(--success);">${Math.round(totalGeneral)} S</span></div>
                     </div>
-
                     ${noteHtml}
-
                     <div class="actions" style="display: flex; gap: 10px; margin-top: 15px;">
-                        <button class="btn-honor" style="flex: 1;" onclick='honorOrder("${o.id}", "${o.client_name}", ${JSON.stringify(orderItems).replace(/'/g, "&#39;")})'>
-                            <i class="fa-solid fa-check"></i> Honorer
-                        </button>
-                        <button style="flex: 1; border: 1px solid var(--warning); color: var(--warning); background: transparent; border-radius: 4px; font-weight: 700; font-family: 'Cinzel'; cursor: pointer;" onclick="openEditOrderModal(${o.id})">
-                            <i class="fa-solid fa-pen"></i> Modifier
-                        </button>
-                        <button class="btn-cancel" style="flex: 1;" onclick="cancelOrder(${o.id})">
-                            <i class="fa-solid fa-xmark"></i> Annuler
-                        </button>
+                        <button class="btn-honor" style="flex: 1;" onclick='honorOrder("${o.id}", "${o.client_name}", ${JSON.stringify(orderItems).replace(/'/g, "&#39;")})'><i class="fa-solid fa-check"></i> Honorer</button>
+                        <button style="flex: 1; border: 1px solid var(--warning); color: var(--warning); background: transparent; border-radius: 4px; font-weight: 700; font-family: 'Cinzel'; cursor: pointer;" onclick="openEditOrderModal(${o.id})"><i class="fa-solid fa-pen"></i> Modifier</button>
+                        <button class="btn-cancel" style="flex: 1;" onclick="cancelOrder(${o.id})"><i class="fa-solid fa-xmark"></i> Annuler</button>
                     </div>
                 </div>`;
     });
@@ -286,119 +302,6 @@ async function loadOrders() {
   }
 }
 
-// ==========================================
-// --- MODIFICATION D'UNE COMMANDE ---
-// ==========================================
-function openEditOrderModal(id) {
-  const order = currentOrders.find((o) => o.id === id);
-  if (!order) return;
-
-  document.getElementById("edit-ord-id").value = order.id;
-  document.getElementById("edit-ord-client").value = order.client_name;
-  document.getElementById("edit-ord-deadline").value = order.deadline || "";
-  document.getElementById("edit-ord-time").value = order.delivery_time || "";
-  document.getElementById("edit-ord-note").value = order.note || "";
-
-  const container = document.getElementById("edit-order-items-container");
-  container.innerHTML = "";
-
-  let orderItems = order.items;
-  if (!orderItems || orderItems.length === 0) {
-    if (order.item_type)
-      orderItems = [
-        {
-          item_type: order.item_type,
-          quantity: order.quantity,
-          unit_price: order.unit_price,
-        },
-      ];
-    else orderItems = [];
-  }
-
-  if (orderItems.length > 0) {
-    orderItems.forEach((item) => addEditItemRow(item));
-  } else {
-    addEditItemRow();
-  }
-
-  document.getElementById("edit-order-modal").style.display = "flex";
-}
-
-function addEditItemRow(itemData = null) {
-  const container = document.getElementById("edit-order-items-container");
-  const row = document.createElement("div");
-  row.className = "edit-order-item-row";
-  row.style.display = "flex";
-  row.style.gap = "8px";
-  row.style.alignItems = "center";
-  row.style.marginBottom = "8px";
-
-  const itemVal = itemData ? itemData.item_type : "Petit bois";
-  const qtyVal = itemData ? itemData.quantity : 1;
-  const priceVal = itemData ? itemData.unit_price : 0.2;
-
-  row.innerHTML = `
-        <select class="edit-order-item-select" style="flex: 2; min-width: 80px; padding: 8px; background: var(--bg-input); border: 1px solid var(--border); color: white; border-radius: 4px;">
-            <option value="Petit bois" ${itemVal === "Petit bois" ? "selected" : ""}>Petit bois</option>
-            <option value="Charbon Pauvre" ${itemVal === "Charbon Pauvre" ? "selected" : ""}>Charbon Pauvre</option>
-            <option value="Charbon Normale" ${itemVal === "Charbon Normale" ? "selected" : ""}>Charbon Normale</option>
-            <option value="Briquettes de Charbon" ${itemVal === "Briquettes de Charbon" ? "selected" : ""}>Briquettes de Charbon</option>
-            <option value="Coke de charbon" ${itemVal === "Coke de charbon" ? "selected" : ""}>Coke de charbon</option>
-        </select>
-        <input type="number" class="edit-order-item-qty" value="${qtyVal}" min="1" style="width: 50px; padding: 8px; background: var(--bg-input); border: 1px solid var(--border); color: white; border-radius: 4px;">
-        <input type="number" class="edit-order-item-price" step="0.01" value="${priceVal}" style="width: 60px; padding: 8px; background: var(--bg-input); border: 1px solid var(--border); color: white; border-radius: 4px;">
-        <button type="button" onclick="this.parentElement.remove()" style="background: transparent; border: 1px solid var(--danger); color: var(--danger); padding: 8px 10px; cursor: pointer; border-radius: 4px;"><i class="fa-solid fa-trash"></i></button>
-    `;
-  container.appendChild(row);
-}
-
-function closeEditOrderModal() {
-  document.getElementById("edit-order-modal").style.display = "none";
-}
-
-async function saveEditedOrder() {
-  const id = document.getElementById("edit-ord-id").value;
-  const client_name = document.getElementById("edit-ord-client").value.trim();
-  const deadline = document.getElementById("edit-ord-deadline").value || null;
-  const delivery_time =
-    document.getElementById("edit-ord-time").value.trim() || null;
-  const note = document.getElementById("edit-ord-note").value.trim() || null;
-
-  const rows = document.querySelectorAll(".edit-order-item-row");
-  let items = [];
-  rows.forEach((row) => {
-    const item_type = row.querySelector(".edit-order-item-select").value;
-    const quantity = parseFloat(
-      row.querySelector(".edit-order-item-qty").value,
-    );
-    const unit_price = parseFloat(
-      row.querySelector(".edit-order-item-price").value,
-    );
-    if (quantity > 0) {
-      items.push({ item_type, quantity, unit_price });
-    }
-  });
-
-  if (items.length === 0)
-    return showPopup("Erreur", "Veuillez ajouter au moins un article.");
-
-  const { error } = await db
-    .from("orders")
-    .update({ client_name, deadline, delivery_time, note, items })
-    .eq("id", id);
-
-  if (error) showPopup("Erreur", error.message);
-  else {
-    showToast("Commande modifiée !", "success");
-    closeEditOrderModal();
-    loadOrders();
-    loadOrderRequirements();
-  }
-}
-
-// ==========================================
-// --- LE RESTE DU CODE EST INCHANGÉ ---
-// ==========================================
 async function honorOrder(id, client_name, itemsJson) {
   const items =
     typeof itemsJson === "string" ? JSON.parse(itemsJson) : itemsJson;
@@ -408,12 +311,8 @@ async function honorOrder(id, client_name, itemsJson) {
       .select("quantity")
       .eq("item_name", item.item_type)
       .single();
-    if (stock && stock.quantity < item.quantity) {
-      return showToast(
-        `Stock insuffisant pour ${item.item_type} (Besoin: ${item.quantity}, Stock: ${stock.quantity})`,
-        "danger",
-      );
-    }
+    if (stock && stock.quantity < item.quantity)
+      return showToast(`Stock insuffisant pour ${item.item_type}`, "danger");
   }
   showConfirm(
     "Honorer la commande",
@@ -432,7 +331,7 @@ async function honorOrder(id, client_name, itemsJson) {
         .insert(transactionsToInsert);
       if (tErr) return showPopup("Erreur", tErr.message);
       await db.from("orders").delete().eq("id", id);
-      showToast("Commande honorée, stock mis à jour !", "success");
+      showToast("Commande honorée !", "success");
       loadOrders();
       loadStock();
       loadOrderRequirements();
@@ -454,6 +353,98 @@ async function cancelOrder(id) {
   });
 }
 
+// ==========================================
+// --- MODIFICATION D'UNE COMMANDE ---
+// ==========================================
+function openEditOrderModal(id) {
+  const order = currentOrders.find((o) => o.id === id);
+  if (!order) return;
+  document.getElementById("edit-ord-id").value = order.id;
+  document.getElementById("edit-ord-client").value = order.client_name;
+  document.getElementById("edit-ord-deadline").value = order.deadline || "";
+  document.getElementById("edit-ord-time").value = order.delivery_time || "";
+  document.getElementById("edit-ord-note").value = order.note || "";
+  const container = document.getElementById("edit-order-items-container");
+  container.innerHTML = "";
+  let orderItems =
+    order.items ||
+    (order.item_type
+      ? [
+          {
+            item_type: order.item_type,
+            quantity: order.quantity,
+            unit_price: order.unit_price,
+          },
+        ]
+      : []);
+  if (orderItems.length > 0) orderItems.forEach((item) => addEditItemRow(item));
+  else addEditItemRow();
+  document.getElementById("edit-order-modal").style.display = "flex";
+}
+
+function addEditItemRow(itemData = null) {
+  const container = document.getElementById("edit-order-items-container");
+  const row = document.createElement("div");
+  row.className = "edit-order-item-row";
+  row.style.display = "flex";
+  row.style.gap = "8px";
+  row.style.alignItems = "center";
+  row.style.marginBottom = "8px";
+  const itemVal = itemData ? itemData.item_type : "Petit bois";
+  const qtyVal = itemData ? itemData.quantity : 1;
+  const priceVal = itemData ? itemData.unit_price : 0.2;
+  row.innerHTML = `
+        <select class="edit-order-item-select" style="flex: 2; min-width: 80px; padding: 8px; background: var(--bg-input); border: 1px solid var(--border); color: white; border-radius: 4px;">
+            <option value="Petit bois" ${itemVal === "Petit bois" ? "selected" : ""}>Petit bois</option><option value="Charbon Pauvre" ${itemVal === "Charbon Pauvre" ? "selected" : ""}>Charbon Pauvre</option><option value="Charbon Normale" ${itemVal === "Charbon Normale" ? "selected" : ""}>Charbon Normale</option><option value="Briquettes de Charbon" ${itemVal === "Briquettes de Charbon" ? "selected" : ""}>Briquettes de Charbon</option><option value="Coke de charbon" ${itemVal === "Coke de charbon" ? "selected" : ""}>Coke de charbon</option>
+        </select>
+        <input type="number" class="edit-order-item-qty" value="${qtyVal}" min="1" style="width: 50px; padding: 8px; background: var(--bg-input); border: 1px solid var(--border); color: white; border-radius: 4px;">
+        <input type="number" class="edit-order-item-price" step="0.01" value="${priceVal}" style="width: 60px; padding: 8px; background: var(--bg-input); border: 1px solid var(--border); color: white; border-radius: 4px;">
+        <button type="button" onclick="this.parentElement.remove()" style="background: transparent; border: 1px solid var(--danger); color: var(--danger); padding: 8px 10px; cursor: pointer; border-radius: 4px;"><i class="fa-solid fa-trash"></i></button>
+    `;
+  container.appendChild(row);
+}
+
+function closeEditOrderModal() {
+  document.getElementById("edit-order-modal").style.display = "none";
+}
+
+async function saveEditedOrder() {
+  const id = document.getElementById("edit-ord-id").value;
+  const client_name = document.getElementById("edit-ord-client").value.trim();
+  const deadline = document.getElementById("edit-ord-deadline").value || null;
+  const delivery_time =
+    document.getElementById("edit-ord-time").value.trim() || null;
+  const note = document.getElementById("edit-ord-note").value.trim() || null;
+  const rows = document.querySelectorAll(".edit-order-item-row");
+  let items = [];
+  rows.forEach((row) => {
+    const item_type = row.querySelector(".edit-order-item-select").value;
+    const quantity = parseFloat(
+      row.querySelector(".edit-order-item-qty").value,
+    );
+    const unit_price = parseFloat(
+      row.querySelector(".edit-order-item-price").value,
+    );
+    if (quantity > 0) items.push({ item_type, quantity, unit_price });
+  });
+  if (items.length === 0)
+    return showPopup("Erreur", "Veuillez ajouter au moins un article.");
+  const { error } = await db
+    .from("orders")
+    .update({ client_name, deadline, delivery_time, note, items })
+    .eq("id", id);
+  if (error) showPopup("Erreur", error.message);
+  else {
+    showToast("Commande modifiée !", "success");
+    closeEditOrderModal();
+    loadOrders();
+    loadOrderRequirements();
+  }
+}
+
+// ==========================================
+// --- BESOINS COMMANDES ---
+// ==========================================
 async function loadOrderRequirements() {
   const { data: orders } = await db.from("orders").select("items");
   const { data: stocks } = await db
@@ -490,11 +481,13 @@ async function loadOrderRequirements() {
       tbody.innerHTML += `<tr><td><span class="badge-type" style="background-color: ${color}; color: ${textColor};">${itemName}</span></td><td style="font-weight: bold; color: var(--warning);">${needed}</td><td style="font-weight: bold;">${inStock}</td><td>${statusHtml}</td></tr>`;
     }
   });
-  if (!hasRequirements) {
+  if (!hasRequirements)
     tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state"><i class="fa-solid fa-check-double"></i><p>Aucun besoin. Toutes les commandes sont honorées.</p></div></td></tr>`;
-  }
 }
 
+// ==========================================
+// --- PERIODES & AUTH ---
+// ==========================================
 function changePeriod(val) {
   currentPeriod = val;
   loadPatronData();
@@ -588,6 +581,7 @@ async function checkUserStatus() {
     document.getElementById("nav-location").style.display = "flex";
     document.getElementById("nav-four").style.display = "flex";
     document.getElementById("nav-historique").style.display = "none";
+    document.getElementById("nav-logs").style.display = "flex";
     const treasuryCard = document.getElementById("treasury-card");
     if (treasuryCard) treasuryCard.style.display = "block";
     switchTab("tab-gestion", document.getElementById("nav-gestion"));
@@ -595,6 +589,7 @@ async function checkUserStatus() {
     loadBarrels();
     loadFurnaces();
     loadEmployeData();
+    loadLogs();
   } else if (profile.role === "contremaitre") {
     if (!profile.is_approved) {
       document.getElementById("app-screen").style.display = "none";
@@ -605,6 +600,7 @@ async function checkUserStatus() {
     document.getElementById("nav-location").style.display = "flex";
     document.getElementById("nav-four").style.display = "flex";
     document.getElementById("nav-historique").style.display = "flex";
+    document.getElementById("nav-logs").style.display = "none";
     const treasuryCard = document.getElementById("treasury-card");
     if (treasuryCard) treasuryCard.style.display = "none";
     switchTab("tab-commandes", document.querySelector(".nav-btn"));
@@ -621,6 +617,7 @@ async function checkUserStatus() {
     document.getElementById("nav-location").style.display = "none";
     document.getElementById("nav-four").style.display = "flex";
     document.getElementById("nav-historique").style.display = "flex";
+    document.getElementById("nav-logs").style.display = "none";
     const treasuryCard = document.getElementById("treasury-card");
     if (treasuryCard) treasuryCard.style.display = "none";
     switchTab("tab-commandes", document.querySelector(".nav-btn"));
@@ -639,12 +636,12 @@ async function checkUserStatus() {
 function setupRealtime() {
   if (realtimeChannel) db.removeChannel(realtimeChannel);
   const isTyping = () => {
-    const active = document.activeElement;
+    const a = document.activeElement;
     return (
-      active &&
-      (active.tagName === "INPUT" ||
-        active.tagName === "SELECT" ||
-        active.tagName === "TEXTAREA")
+      a &&
+      (a.tagName === "INPUT" ||
+        a.tagName === "SELECT" ||
+        a.tagName === "TEXTAREA")
     );
   };
   realtimeChannel = db
@@ -668,12 +665,8 @@ function setupRealtime() {
           loadStock();
           loadOrderRequirements();
         }
-        if (payload.new && payload.new.quantity <= 20) {
-          showToast(
-            `⚠️ Stock critique : ${payload.new.item_name} (${payload.new.quantity} restants)`,
-            "warning",
-          );
-        }
+        if (payload.new && payload.new.quantity <= 20)
+          showToast(`⚠️ Stock critique : ${payload.new.item_name}`, "warning");
       },
     )
     .on(
@@ -728,9 +721,17 @@ function setupRealtime() {
         }
       },
     )
+    .on(
+      "postgres_changes",
+      { event: "INSERT", schema: "public", table: "logs" },
+      () => {
+        if (!isTyping() && userProfile.role === "patron") loadLogs();
+      },
+    )
     .subscribe();
 }
 
+// --- TRESORERIE, STOCK, SAISIE ---
 async function loadTreasury() {
   if (!userProfile || userProfile.role !== "patron") return;
   const { data: transactions } = await db.from("transactions").select("*");
@@ -749,7 +750,6 @@ async function loadTreasury() {
   const el = document.getElementById("current-treasury");
   if (el) el.value = Math.floor(tV - tA - tS + tAj);
 }
-
 async function updateTreasuryDirect(input) {
   const newValue = parseInt(input.value);
   if (isNaN(newValue) || newValue < 0) return loadTreasury();
@@ -785,6 +785,7 @@ async function updateTreasuryDirect(input) {
         showPopup("Erreur", error.message);
         loadTreasury();
       } else {
+        await addLog("Trésorerie", `Ajustement direct de ${diff} S.`);
         showToast("Trésorerie ajustée", "success");
         loadTreasury();
         loadPatronData();
@@ -792,7 +793,6 @@ async function updateTreasuryDirect(input) {
     },
   );
 }
-
 async function adjustTreasury(type) {
   const amount = parseInt(document.getElementById("manual-amount").value);
   if (!amount || amount <= 0) return showPopup("Erreur", "Montant invalide.");
@@ -813,6 +813,7 @@ async function adjustTreasury(type) {
         });
       if (error) showPopup("Erreur", error.message);
       else {
+        await addLog("Trésorerie", `${action} manuel de ${amount} S.`);
         showToast(`${amount} S ${action.toLowerCase()}s.`, "success");
         document.getElementById("manual-amount").value = "";
         loadTreasury();
@@ -843,8 +844,8 @@ async function loadStock() {
                 <div class="stock-controls">
                     <input type="number" id="stock-qty-${s.id}" placeholder="Qté" min="1">
                     <div class="stock-buttons">
-                        <button class="btn-add" onclick="adjustStock(${s.id}, ${s.quantity}, 1)"><i class="fa-solid fa-plus"></i></button>
-                        <button class="btn-sub" onclick="adjustStock(${s.id}, ${s.quantity}, -1)"><i class="fa-solid fa-minus"></i></button>
+                        <button class="btn-add" onclick="adjustStock(${s.id}, ${s.quantity}, 1, '${s.item_name}')"><i class="fa-solid fa-plus"></i></button>
+                        <button class="btn-sub" onclick="adjustStock(${s.id}, ${s.quantity}, -1, '${s.item_name}')"><i class="fa-solid fa-minus"></i></button>
                     </div>
                 </div>`
           : "";
@@ -854,14 +855,14 @@ async function loadStock() {
     container.innerHTML = `<div class="empty-state"><p>Stock vide.</p></div>`;
   }
 }
-
-async function adjustStock(id, currentQty, op) {
+async function adjustStock(id, currentQty, op, itemName) {
   const input = document.getElementById(`stock-qty-${id}`);
   const amount = parseInt(input.value);
   if (!amount || amount <= 0) return showPopup("Erreur", "Qté invalide.");
   let newQty = op === 1 ? currentQty + amount : currentQty - amount;
   if (newQty < 0) newQty = 0;
   await db.from("stocks").update({ quantity: newQty }).eq("id", id);
+  await addLog("Stock", `A modifié ${itemName} de ${currentQty} à ${newQty}.`);
   input.value = "";
   loadStock();
 }
@@ -886,7 +887,6 @@ function updateBasePrice() {
   select.style.color = item === "Charbon Normale" ? "#333" : "#fff";
   calcEmpTotal();
 }
-
 document.getElementById("emp-quantity").addEventListener("input", calcEmpTotal);
 document.getElementById("emp-price").addEventListener("input", calcEmpTotal);
 function calcEmpTotal() {
@@ -913,10 +913,7 @@ async function addTransaction(e) {
       .eq("item_name", item_type)
       .single();
     if (stock && stock.quantity < quantity)
-      return showToast(
-        `Stock insuffisant pour ${item_type} (${stock.quantity} restants)`,
-        "danger",
-      );
+      return showToast(`Stock insuffisant pour ${item_type}`, "danger");
   }
   const { error } = await db
     .from("transactions")
@@ -942,6 +939,7 @@ async function addTransaction(e) {
   }
 }
 
+// --- GESTION PATRON (PAGINATION) ---
 async function loadPatronData() {
   const { data: personnel, error } = await db
     .from("profiles")
@@ -997,22 +995,27 @@ async function loadPatronData() {
       salDiv.innerHTML = `<div class="empty-state"><p>Aucun employé validé.</p></div>`;
   }
   updateSalaryTotal();
+
+  // PAGINATION : On limite le nombre de transactions récupérées
   const { data: allT } = await db
     .from("transactions")
     .select("*")
-    .order("created_at", { ascending: false });
-  const filtered = getFilteredTransactions(allT);
+    .order("created_at", { ascending: false })
+    .limit(transactionLimit);
+
+  // On récupère TOUTES les transactions pour les stats globales (pour ne pas fausser les totaux)
+  const { data: globalT } = await db
+    .from("transactions")
+    .select("quantity, unit_price, type, created_at");
+
+  const filtered = getFilteredTransactions(globalT); // Pour les stats
+  const displayFiltered = getFilteredTransactions(allT); // Pour l'affichage tableau
+
   const tbody = document.getElementById("admin-history-body");
-  if (filtered && filtered.length > 0) {
+  if (displayFiltered && displayFiltered.length > 0) {
     tbody.innerHTML = "";
-    let tA = 0,
-      tV = 0,
-      tS = 0;
-    filtered.forEach((t) => {
+    displayFiltered.forEach((t) => {
       const cost = t.quantity * t.unit_price;
-      if (t.type === "achat") tA += cost;
-      else if (t.type === "salaire") tS += cost;
-      else if (t.type === "vente") tV += cost;
       const color = typeColors[t.item_type] || "#888";
       const textColor = t.item_type === "Charbon Normale" ? "#333" : "#fff";
       let bC = "bg-secondary",
@@ -1035,21 +1038,37 @@ async function loadPatronData() {
       }
       tbody.innerHTML += `<tr><td>${new Date(t.created_at).toLocaleDateString()}</td><td>${t.counterparty_name}</td><td><span class="badge-type ${bC}" style="${t.type === "ajustement" ? "background-color: #3b82f6; color: white;" : ""}">${t.type.toUpperCase()}</span></td><td><span class="badge-type" style="background-color: ${color}; color: ${textColor};">${t.item_type}</span></td><td>${t.quantity}</td><td>${parseFloat(t.unit_price).toFixed(2)} S</td><td class="${tC}">${Math.round(cost)} S</td><td><button class="btn-icon text-danger" onclick="deleteTransaction(${t.id})"><i class="fa-solid fa-trash"></i></button></td></tr>`;
     });
-    const tD = tA + tS;
-    document.getElementById("stat-ventes").innerText = Math.round(tV) + " S";
-    document.getElementById("stat-achats").innerText = Math.round(tD) + " S";
-    const b = tV - tD;
-    const eB = document.getElementById("stat-benefice");
-    eB.innerText = Math.round(b) + " S";
-    eB.className = b >= 0 ? "text-success" : "text-danger";
-    renderCharts(filtered);
+
+    // Affichage du bouton "Voir plus" s'il y a plus de données en base que ce qui est affiché
+    const btnLoadMore = document.getElementById("btn-load-more");
+    if (globalT.length > transactionLimit)
+      btnLoadMore.style.display = "inline-block";
+    else btnLoadMore.style.display = "none";
   } else {
     tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><p>Aucune transaction.</p></div></td></tr>`;
-    document.getElementById("stat-ventes").innerText = "0 S";
-    document.getElementById("stat-achats").innerText = "0 S";
-    document.getElementById("stat-benefice").innerText = "0 S";
-    renderCharts([]);
+    document.getElementById("btn-load-more").style.display = "none";
   }
+
+  // Calcul des stats basées sur TOUTES les transactions filtrées
+  let tA = 0,
+    tV = 0,
+    tS = 0;
+  filtered.forEach((t) => {
+    const cost = t.quantity * t.unit_price;
+    if (t.type === "achat") tA += cost;
+    else if (t.type === "salaire") tS += cost;
+    else if (t.type === "vente") tV += cost;
+  });
+  const tD = tA + tS;
+  document.getElementById("stat-ventes").innerText = Math.round(tV) + " S";
+  document.getElementById("stat-achats").innerText = Math.round(tD) + " S";
+  const b = tV - tD;
+  const eB = document.getElementById("stat-benefice");
+  eB.innerText = Math.round(b) + " S";
+  eB.className = b >= 0 ? "text-success" : "text-danger";
+
+  // Graphiques basés sur toutes les transactions filtrées
+  renderCharts(filtered);
 }
 
 function renderCharts(transactions) {
@@ -1144,6 +1163,7 @@ function renderCharts(transactions) {
   });
 }
 
+// ... Le reste des fonctions (modales, tonneaux, fours) reste identique ...
 async function showUserHistory(userId, userName) {
   document.getElementById("user-history-title").innerText =
     `Historique de ${userName}`;
@@ -1154,7 +1174,8 @@ async function showUserHistory(userId, userName) {
     .from("transactions")
     .select("*")
     .eq("created_by", userId)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(50);
   const tbody = document.getElementById("user-history-body");
   if (transactions && transactions.length > 0) {
     tbody.innerHTML = "";
@@ -1278,7 +1299,7 @@ async function loadBarrels() {
       cE.innerHTML = `<i class="fa-solid fa-user"></i> ${rental.client_name}`;
       let pH = `<div class="barrel-price-container"><span style="color: var(--text-muted); font-size: 0.9em;">Prix :</span> <div style="display:flex; align-items:center; gap:5px;"><span style="color: var(--primary); font-weight: bold; font-family: 'Cinzel';">${rental.price || 50}</span><span style="color: var(--primary); font-weight: bold;">S</span></div></div>`;
       if (userProfile.role === "patron")
-        pH = `<div class="barrel-price-container" onclick="this.querySelector('input').focus()"><span style="color: var(--text-muted); font-size: 0.9em;">Prix :</span> <div style="display:flex; align-items:center; gap:5px;"><input type="number" class="barrel-price-input" value="${rental.price || 50}" onchange="updateBarrelPrice(${rental.id}, this.value)"><span style="color: var(--primary); font-weight: bold;">S</span><i class="fa-solid fa-pen" style="color: var(--text-muted); font-size: 0.8em; margin-left: 5px;"></i></div></div>`;
+        pH = `<div class="barrel-price-container" onclick="this.querySelector('input').focus()"><span style="color: var(--text-muted); font-size: 0.9em;">Prix :</span> <div style="display:flex; align-items:center; gap:5px;"><input type="number" class="barrel-price-input" value="${rental.price || 50}" onchange="updateBarrelPrice(${rental.id}, this.value, ${i})"><span style="color: var(--primary); font-weight: bold;">S</span><i class="fa-solid fa-pen" style="color: var(--text-muted); font-size: 0.8em; margin-left: 5px;"></i></div></div>`;
       if (rental.last_payment_date) {
         const lP = new Date(rental.last_payment_date),
           nP = new Date(lP);
@@ -1342,10 +1363,11 @@ async function confirmAllocateBarrel() {
   closeAllocateModal();
   loadBarrels();
 }
-async function updateBarrelPrice(id, np) {
+async function updateBarrelPrice(id, np, num) {
   const p = parseFloat(np);
   if (isNaN(p) || p < 0) return loadBarrels();
   await db.from("barrel_rentals").update({ price: p }).eq("id", id);
+  await addLog("Tonneau", `A modifié le prix du tonneau n°${num} à ${p} S.`);
   loadBarrels();
 }
 async function payBarrel(id, num, cN) {
@@ -1497,7 +1519,8 @@ async function loadEmployeData() {
     .from("transactions")
     .select("*")
     .eq("created_by", currentUser.id)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(50);
   const tbody = document.getElementById("emp-history-body");
   if (!tbody) return;
   if (data && data.length > 0) {
