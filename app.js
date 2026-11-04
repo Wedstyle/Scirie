@@ -19,13 +19,6 @@ const basePricesVente = {
   "Briquettes de Charbon": 3,
   "Coke de charbon": 6,
 };
-const basePricesAchat = {
-  "Petit bois": 0.15,
-  "Charbon Pauvre": 0.3,
-  "Charbon Normale": 0.8,
-  "Briquettes de Charbon": 1.5,
-  "Coke de charbon": 3,
-};
 const typeColors = {
   "Petit bois": "#8B4513",
   "Charbon Pauvre": "#5a5a5a",
@@ -172,6 +165,7 @@ async function createOrder(e) {
     document.getElementById("order-items-container").innerHTML = "";
     addOrderItemRow();
     loadOrders();
+    loadOrderRequirements(); // Mise à jour des besoins
   }
 }
 
@@ -299,6 +293,7 @@ async function honorOrder(id, client_name, itemsJson) {
       );
       loadOrders();
       loadStock();
+      loadOrderRequirements();
       loadEmployeData();
       if (userProfile.role === "patron") {
         loadPatronData();
@@ -312,7 +307,74 @@ async function cancelOrder(id) {
   showConfirm("Annuler", "Annuler cette commande ?", async () => {
     await db.from("orders").delete().eq("id", id);
     loadOrders();
+    loadOrderRequirements(); // Mise à jour des besoins
   });
+}
+
+// ==========================================
+// --- CALCUL DES BESOINS DE COMMANDES ---
+// ==========================================
+async function loadOrderRequirements() {
+  const { data: orders } = await db.from("orders").select("items");
+  const { data: stocks } = await db
+    .from("stocks")
+    .select("item_name, quantity");
+
+  const tbody = document.getElementById("order-requirements-body");
+  if (!tbody) return;
+
+  let requirements = {};
+
+  // Initialiser les besoins à 0 pour toutes les ressources en stock
+  if (stocks) {
+    stocks.forEach((s) => (requirements[s.item_name] = 0));
+  }
+
+  // Additionner les quantités demandées dans les commandes
+  if (orders) {
+    orders.forEach((o) => {
+      if (o.items && Array.isArray(o.items)) {
+        o.items.forEach((item) => {
+          if (!requirements[item.item_type]) requirements[item.item_type] = 0;
+          requirements[item.item_type] += item.quantity;
+        });
+      }
+    });
+  }
+
+  tbody.innerHTML = "";
+  let hasRequirements = false;
+
+  Object.keys(requirements).forEach((itemName) => {
+    const needed = requirements[itemName];
+    if (needed > 0) {
+      hasRequirements = true;
+      const stockItem = stocks.find((s) => s.item_name === itemName);
+      const inStock = stockItem ? stockItem.quantity : 0;
+
+      let statusHtml = "";
+      if (inStock >= needed) {
+        statusHtml = `<span class="text-success"><i class="fa-solid fa-check"></i> Suffisant</span>`;
+      } else {
+        statusHtml = `<span class="text-danger"><i class="fa-solid fa-xmark"></i> Manque ${needed - inStock}</span>`;
+      }
+
+      const color = typeColors[itemName] || "#888";
+
+      tbody.innerHTML += `
+                <tr>
+                    <td><span class="badge-type" style="background-color: ${color}; color: #fff;">${itemName}</span></td>
+                    <td style="font-weight: bold; font-size: 1.1em; color: var(--warning);">${needed}</td>
+                    <td style="font-weight: bold; font-size: 1.1em;">${inStock}</td>
+                    <td>${statusHtml}</td>
+                </tr>
+            `;
+    }
+  });
+
+  if (!hasRequirements) {
+    tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state"><i class="fa-solid fa-check-double"></i><p>Aucun besoin. Toutes les commandes sont honorées.</p></div></td></tr>`;
+  }
 }
 
 // ==========================================
@@ -460,6 +522,7 @@ async function checkUserStatus() {
   loadStock();
   loadTreasury();
   loadOrders();
+  loadOrderRequirements();
   updateBasePrice();
   setupRealtime();
 }
@@ -492,7 +555,10 @@ function setupRealtime() {
       "postgres_changes",
       { event: "*", schema: "public", table: "stocks" },
       () => {
-        if (!isTyping()) loadStock();
+        if (!isTyping()) {
+          loadStock();
+          loadOrderRequirements();
+        }
       },
     )
     .on(
@@ -520,7 +586,10 @@ function setupRealtime() {
       "postgres_changes",
       { event: "*", schema: "public", table: "orders" },
       () => {
-        if (!isTyping()) loadOrders();
+        if (!isTyping()) {
+          loadOrders();
+          loadOrderRequirements();
+        }
       },
     )
     .subscribe();
@@ -569,14 +638,16 @@ async function updateTreasuryDirect(input) {
     "Modification directe",
     `Ajuster de ${diff > 0 ? "+" : ""}${diff} S ?`,
     async () => {
-      const { error } = await db.from("transactions").insert({
-        type: "ajustement",
-        item_type: "Ajustement",
-        counterparty_name: "Modification directe",
-        quantity: 1,
-        unit_price: diff,
-        created_by: currentUser.id,
-      });
+      const { error } = await db
+        .from("transactions")
+        .insert({
+          type: "ajustement",
+          item_type: "Ajustement",
+          counterparty_name: "Modification directe",
+          quantity: 1,
+          unit_price: diff,
+          created_by: currentUser.id,
+        });
       if (error) {
         showPopup("Erreur", error.message);
         loadTreasury();
@@ -596,14 +667,16 @@ async function adjustTreasury(type) {
     `Ajustement`,
     `Voulez-vous ${action.toLowerCase()} ${amount} S ?`,
     async () => {
-      const { error } = await db.from("transactions").insert({
-        type: "ajustement",
-        item_type: "Ajustement",
-        counterparty_name: `Manuel (${action})`,
-        quantity: 1,
-        unit_price: type === 1 ? amount : -amount,
-        created_by: currentUser.id,
-      });
+      const { error } = await db
+        .from("transactions")
+        .insert({
+          type: "ajustement",
+          item_type: "Ajustement",
+          counterparty_name: `Manuel (${action})`,
+          quantity: 1,
+          unit_price: type === 1 ? amount : -amount,
+          created_by: currentUser.id,
+        });
       if (error) showPopup("Erreur", error.message);
       else {
         showPopup("Succès", `${amount} S ${action.toLowerCase()}s.`);
@@ -678,7 +751,7 @@ function updateBasePrice() {
     let price =
       type === "vente"
         ? basePricesVente[item] || 0
-        : basePricesAchat[item] || 0;
+        : basePricesVente[item] * 0.75;
     document.getElementById("emp-price").value = price;
   }
   select.style.backgroundColor = typeColors[item] || "#333";
@@ -717,14 +790,16 @@ async function addTransaction(e) {
         `Il ne reste que ${stock.quantity}.`,
       );
   }
-  const { error } = await db.from("transactions").insert({
-    type,
-    item_type,
-    counterparty_name: userProfile.full_name,
-    quantity,
-    unit_price,
-    created_by: currentUser.id,
-  });
+  const { error } = await db
+    .from("transactions")
+    .insert({
+      type,
+      item_type,
+      counterparty_name: userProfile.full_name,
+      quantity,
+      unit_price,
+      created_by: currentUser.id,
+    });
   if (error) showPopup("Erreur", error.message);
   else {
     showPopup("Succès", "Enregistré !");
@@ -1131,11 +1206,13 @@ async function confirmAllocateBarrel() {
   const p = parseFloat(document.getElementById("allocate-price").value) || 50;
   if (!cN) return showPopup("Erreur", "Nom invalide.");
   if (!currentBarrelToAllocate) return;
-  await db.from("barrel_rentals").insert({
-    barrel_number: currentBarrelToAllocate,
-    client_name: cN,
-    price: p,
-  });
+  await db
+    .from("barrel_rentals")
+    .insert({
+      barrel_number: currentBarrelToAllocate,
+      client_name: cN,
+      price: p,
+    });
   showPopup("Succès", `Tonneau alloué.`);
   closeAllocateModal();
   loadBarrels();
@@ -1168,14 +1245,16 @@ async function payBarrel(id, num, cN) {
       .from("barrel_rentals")
       .update({ last_payment_date: new Date().toISOString() })
       .eq("id", id);
-    await db.from("transactions").insert({
-      type: "vente",
-      item_type: "Location tonneau",
-      counterparty_name: cN,
-      quantity: 1,
-      unit_price: fp,
-      created_by: currentUser.id,
-    });
+    await db
+      .from("transactions")
+      .insert({
+        type: "vente",
+        item_type: "Location tonneau",
+        counterparty_name: cN,
+        quantity: 1,
+        unit_price: fp,
+        created_by: currentUser.id,
+      });
     showPopup("Payé", `${fp} S encaissés.`);
     loadBarrels();
     if (userProfile.role === "patron") {
@@ -1262,14 +1341,16 @@ async function payFurnace(id, cN) {
       .from("furnace_rentals")
       .update({ last_payment_date: new Date().toISOString() })
       .eq("id", id);
-    await db.from("transactions").insert({
-      type: "vente",
-      item_type: "Location four",
-      counterparty_name: cN,
-      quantity: 1,
-      unit_price: 30,
-      created_by: currentUser.id,
-    });
+    await db
+      .from("transactions")
+      .insert({
+        type: "vente",
+        item_type: "Location four",
+        counterparty_name: cN,
+        quantity: 1,
+        unit_price: 30,
+        created_by: currentUser.id,
+      });
     showPopup("Payé", `30 S encaissés.`);
     loadFurnaces();
     if (userProfile.role === "patron") {

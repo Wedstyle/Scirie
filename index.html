@@ -230,7 +230,6 @@
                       </div>
                     </div>
 
-                    <!-- NOUVEAU : Champ de note -->
                     <div class="input-group mb-15">
                       <label>Note / Instructions (Optionnel)</label>
                       <textarea
@@ -393,6 +392,37 @@
               <div class="card">
                 <h3>Ressources en stock</h3>
                 <div class="stock-grid" id="stock-container"></div>
+              </div>
+
+              <!-- NOUVEAU : Besoins pour les Commandes -->
+              <div class="card" style="border: 1px solid var(--warning)">
+                <h3 style="color: var(--warning)">
+                  <i class="fa-solid fa-triangle-exclamation"></i> Besoins pour
+                  les Commandes en Attente
+                </h3>
+                <p
+                  style="
+                    font-size: 0.9em;
+                    color: var(--text-muted);
+                    margin-bottom: 15px;
+                  "
+                >
+                  Voici les quantités nécessaires pour honorer toutes les
+                  commandes actuellement en attente.
+                </p>
+                <div class="table-responsive">
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <th>Ressource</th>
+                        <th>Besoin Total</th>
+                        <th>En Stock</th>
+                        <th>Statut</th>
+                      </tr>
+                    </thead>
+                    <tbody id="order-requirements-body"></tbody>
+                  </table>
+                </div>
               </div>
             </section>
 
