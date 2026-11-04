@@ -215,16 +215,14 @@ async function createOrder(e) {
   if (items.length === 0)
     return showPopup("Erreur", "Veuillez ajouter au moins un article.");
 
-  const { error } = await db
-    .from("orders")
-    .insert({
-      client_name,
-      items,
-      delivery_time,
-      deadline,
-      note,
-      created_by: currentUser.id,
-    });
+  const { error } = await db.from("orders").insert({
+    client_name,
+    items,
+    delivery_time,
+    deadline,
+    note,
+    created_by: currentUser.id,
+  });
   if (error) showPopup("Erreur", error.message);
   else {
     showToast("Commande créée !", "success");
@@ -413,6 +411,7 @@ async function saveEditedOrder() {
   const delivery_time =
     document.getElementById("edit-ord-time").value.trim() || null;
   const note = document.getElementById("edit-ord-note").value.trim() || null;
+
   const rows = document.querySelectorAll(".edit-order-item-row");
   let items = [];
   rows.forEach((row) => {
@@ -425,14 +424,26 @@ async function saveEditedOrder() {
     );
     if (quantity > 0) items.push({ item_type, quantity, unit_price });
   });
+
   if (items.length === 0)
     return showPopup("Erreur", "Veuillez ajouter au moins un article.");
-  const { error } = await db
+
+  // La modification avec .select() pour vérifier que ça a bien marché
+  const { data, error } = await db
     .from("orders")
     .update({ client_name, deadline, delivery_time, note, items })
-    .eq("id", id);
-  if (error) showPopup("Erreur", error.message);
-  else {
+    .eq("id", id)
+    .select();
+
+  if (error) {
+    console.error(error);
+    showPopup("Erreur", error.message);
+  } else if (!data || data.length === 0) {
+    showPopup(
+      "Erreur",
+      "Impossible de modifier la commande. Vérifiez les règles de sécurité (RLS) dans Supabase.",
+    );
+  } else {
     showToast("Commande modifiée !", "success");
     closeEditOrderModal();
     loadOrders();
@@ -769,16 +780,14 @@ async function updateTreasuryDirect(input) {
     "Modification directe",
     `Ajuster de ${diff > 0 ? "+" : ""}${diff} S ?`,
     async () => {
-      const { error } = await db
-        .from("transactions")
-        .insert({
-          type: "ajustement",
-          item_type: "Ajustement",
-          counterparty_name: "Modification directe",
-          quantity: 1,
-          unit_price: diff,
-          created_by: currentUser.id,
-        });
+      const { error } = await db.from("transactions").insert({
+        type: "ajustement",
+        item_type: "Ajustement",
+        counterparty_name: "Modification directe",
+        quantity: 1,
+        unit_price: diff,
+        created_by: currentUser.id,
+      });
       if (error) {
         showPopup("Erreur", error.message);
         loadTreasury();
@@ -799,16 +808,14 @@ async function adjustTreasury(type) {
     `Ajustement`,
     `Voulez-vous ${action.toLowerCase()} ${amount} S ?`,
     async () => {
-      const { error } = await db
-        .from("transactions")
-        .insert({
-          type: "ajustement",
-          item_type: "Ajustement",
-          counterparty_name: `Manuel (${action})`,
-          quantity: 1,
-          unit_price: type === 1 ? amount : -amount,
-          created_by: currentUser.id,
-        });
+      const { error } = await db.from("transactions").insert({
+        type: "ajustement",
+        item_type: "Ajustement",
+        counterparty_name: `Manuel (${action})`,
+        quantity: 1,
+        unit_price: type === 1 ? amount : -amount,
+        created_by: currentUser.id,
+      });
       if (error) showPopup("Erreur", error.message);
       else {
         await addLog("Trésorerie", `${action} manuel de ${amount} S.`);
@@ -913,16 +920,14 @@ async function addTransaction(e) {
     if (stock && stock.quantity < quantity)
       return showToast(`Stock insuffisant pour ${item_type}`, "danger");
   }
-  const { error } = await db
-    .from("transactions")
-    .insert({
-      type,
-      item_type,
-      counterparty_name: userProfile.full_name,
-      quantity,
-      unit_price,
-      created_by: currentUser.id,
-    });
+  const { error } = await db.from("transactions").insert({
+    type,
+    item_type,
+    counterparty_name: userProfile.full_name,
+    quantity,
+    unit_price,
+    created_by: currentUser.id,
+  });
   if (error) showPopup("Erreur", error.message);
   else {
     showToast("Opération enregistrée !", "success");
@@ -1381,13 +1386,11 @@ async function confirmAllocateBarrel() {
   const p = parseFloat(document.getElementById("allocate-price").value) || 50;
   if (!cN) return showPopup("Erreur", "Nom invalide.");
   if (!currentBarrelToAllocate) return;
-  await db
-    .from("barrel_rentals")
-    .insert({
-      barrel_number: currentBarrelToAllocate,
-      client_name: cN,
-      price: p,
-    });
+  await db.from("barrel_rentals").insert({
+    barrel_number: currentBarrelToAllocate,
+    client_name: cN,
+    price: p,
+  });
   showToast("Tonneau alloué.", "success");
   closeAllocateModal();
   loadBarrels();
@@ -1421,16 +1424,14 @@ async function payBarrel(id, num, cN) {
       .from("barrel_rentals")
       .update({ last_payment_date: new Date().toISOString() })
       .eq("id", id);
-    await db
-      .from("transactions")
-      .insert({
-        type: "vente",
-        item_type: "Location tonneau",
-        counterparty_name: cN,
-        quantity: 1,
-        unit_price: fp,
-        created_by: currentUser.id,
-      });
+    await db.from("transactions").insert({
+      type: "vente",
+      item_type: "Location tonneau",
+      counterparty_name: cN,
+      quantity: 1,
+      unit_price: fp,
+      created_by: currentUser.id,
+    });
     showToast(`${fp} S encaissés.`, "success");
     loadBarrels();
     if (userProfile.role === "patron") {
@@ -1515,16 +1516,14 @@ async function payFurnace(id, cN) {
       .from("furnace_rentals")
       .update({ last_payment_date: new Date().toISOString() })
       .eq("id", id);
-    await db
-      .from("transactions")
-      .insert({
-        type: "vente",
-        item_type: "Location four",
-        counterparty_name: cN,
-        quantity: 1,
-        unit_price: 30,
-        created_by: currentUser.id,
-      });
+    await db.from("transactions").insert({
+      type: "vente",
+      item_type: "Location four",
+      counterparty_name: cN,
+      quantity: 1,
+      unit_price: 30,
+      created_by: currentUser.id,
+    });
     showToast("30 S encaissés.", "success");
     loadFurnaces();
     if (userProfile.role === "patron") {
