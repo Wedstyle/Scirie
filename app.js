@@ -11,6 +11,7 @@ let chartVentesInstance = null;
 let currentPeriod = "all";
 let currentBarrelToAllocate = null;
 let realtimeChannel = null;
+let currentOrders = []; // Stockage global des commandes pour la modification
 
 const basePricesVente = {
   "Petit bois": 0.2,
@@ -33,7 +34,7 @@ const typeColors = {
 };
 
 // ==========================================
-// --- UI HELPERS ---
+// --- UI HELPERS & TOASTS ---
 // ==========================================
 function showPopup(title, message) {
   document.getElementById("popup-title").innerText = title;
@@ -42,6 +43,23 @@ function showPopup(title, message) {
 }
 function closePopup() {
   document.getElementById("custom-popup").style.display = "none";
+}
+
+function showToast(message, type = "info") {
+  const container = document.getElementById("toast-container");
+  if (!container) return;
+  const toast = document.createElement("div");
+  toast.className = `toast toast-${type}`;
+  let icon = "fa-circle-info";
+  if (type === "success") icon = "fa-check-circle";
+  if (type === "warning") icon = "fa-triangle-exclamation";
+  if (type === "danger") icon = "fa-circle-xmark";
+  toast.innerHTML = `<i class="fa-solid ${icon}"></i> <span>${message}</span>`;
+  container.appendChild(toast);
+  setTimeout(() => {
+    toast.classList.add("hiding");
+    setTimeout(() => toast.remove(), 300);
+  }, 4000);
 }
 
 let confirmCallback = null;
@@ -73,6 +91,18 @@ function switchTab(tabId, btnElement) {
     .forEach((btn) => btn.classList.remove("active"));
   document.getElementById(tabId).classList.add("active");
   if (btnElement) btnElement.classList.add("active");
+}
+
+function updateOrdersCount(count) {
+  const badge = document.getElementById("orders-count");
+  if (badge) {
+    if (count > 0) {
+      badge.style.display = "inline-block";
+      badge.innerText = count;
+    } else {
+      badge.style.display = "none";
+    }
+  }
 }
 
 // ==========================================
@@ -120,6 +150,9 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
+// ==========================================
+// --- GESTION DES COMMANDES (CRÉATION & MODIFICATION) ---
+// ==========================================
 async function createOrder(e) {
   e.preventDefault();
   const client_name = document.getElementById("ord-client").value.trim();
@@ -130,7 +163,6 @@ async function createOrder(e) {
 
   const rows = document.querySelectorAll(".order-item-row");
   let items = [];
-  let total = 0;
 
   rows.forEach((row) => {
     const item_type = row.querySelector(".order-item-select").value;
@@ -139,7 +171,6 @@ async function createOrder(e) {
 
     if (quantity > 0) {
       items.push({ item_type, quantity, unit_price });
-      total += quantity * unit_price;
     }
   });
 
@@ -160,12 +191,12 @@ async function createOrder(e) {
 
   if (error) showPopup("Erreur", error.message);
   else {
-    showPopup("Succès", "Commande créée !");
+    showToast("Commande créée !", "success");
     document.getElementById("order-form").reset();
     document.getElementById("order-items-container").innerHTML = "";
     addOrderItemRow();
     loadOrders();
-    loadOrderRequirements(); // Mise à jour des besoins
+    loadOrderRequirements();
   }
 }
 
@@ -176,6 +207,9 @@ async function loadOrders() {
     .order("created_at", { ascending: true });
   const container = document.getElementById("orders-container");
   if (!container) return;
+
+  currentOrders = orders || []; // Sauvegarde pour la modification
+  updateOrdersCount(orders ? orders.length : 0);
 
   if (orders && orders.length > 0) {
     container.innerHTML = "";
@@ -238,6 +272,9 @@ async function loadOrders() {
                         <button class="btn-honor" style="flex: 1;" onclick='honorOrder("${o.id}", "${o.client_name}", ${JSON.stringify(orderItems).replace(/'/g, "&#39;")})'>
                             <i class="fa-solid fa-check"></i> Honorer
                         </button>
+                        <button style="flex: 1; border: 1px solid var(--warning); color: var(--warning); background: transparent; border-radius: 4px; font-weight: 700; font-family: 'Cinzel'; cursor: pointer;" onclick="openEditOrderModal(${o.id})">
+                            <i class="fa-solid fa-pen"></i> Modifier
+                        </button>
                         <button class="btn-cancel" style="flex: 1;" onclick="cancelOrder(${o.id})">
                             <i class="fa-solid fa-xmark"></i> Annuler
                         </button>
@@ -249,10 +286,122 @@ async function loadOrders() {
   }
 }
 
+// ==========================================
+// --- MODIFICATION D'UNE COMMANDE ---
+// ==========================================
+function openEditOrderModal(id) {
+  const order = currentOrders.find((o) => o.id === id);
+  if (!order) return;
+
+  document.getElementById("edit-ord-id").value = order.id;
+  document.getElementById("edit-ord-client").value = order.client_name;
+  document.getElementById("edit-ord-deadline").value = order.deadline || "";
+  document.getElementById("edit-ord-time").value = order.delivery_time || "";
+  document.getElementById("edit-ord-note").value = order.note || "";
+
+  const container = document.getElementById("edit-order-items-container");
+  container.innerHTML = "";
+
+  let orderItems = order.items;
+  if (!orderItems || orderItems.length === 0) {
+    if (order.item_type)
+      orderItems = [
+        {
+          item_type: order.item_type,
+          quantity: order.quantity,
+          unit_price: order.unit_price,
+        },
+      ];
+    else orderItems = [];
+  }
+
+  if (orderItems.length > 0) {
+    orderItems.forEach((item) => addEditItemRow(item));
+  } else {
+    addEditItemRow();
+  }
+
+  document.getElementById("edit-order-modal").style.display = "flex";
+}
+
+function addEditItemRow(itemData = null) {
+  const container = document.getElementById("edit-order-items-container");
+  const row = document.createElement("div");
+  row.className = "edit-order-item-row";
+  row.style.display = "flex";
+  row.style.gap = "8px";
+  row.style.alignItems = "center";
+  row.style.marginBottom = "8px";
+
+  const itemVal = itemData ? itemData.item_type : "Petit bois";
+  const qtyVal = itemData ? itemData.quantity : 1;
+  const priceVal = itemData ? itemData.unit_price : 0.2;
+
+  row.innerHTML = `
+        <select class="edit-order-item-select" style="flex: 2; min-width: 80px; padding: 8px; background: var(--bg-input); border: 1px solid var(--border); color: white; border-radius: 4px;">
+            <option value="Petit bois" ${itemVal === "Petit bois" ? "selected" : ""}>Petit bois</option>
+            <option value="Charbon Pauvre" ${itemVal === "Charbon Pauvre" ? "selected" : ""}>Charbon Pauvre</option>
+            <option value="Charbon Normale" ${itemVal === "Charbon Normale" ? "selected" : ""}>Charbon Normale</option>
+            <option value="Briquettes de Charbon" ${itemVal === "Briquettes de Charbon" ? "selected" : ""}>Briquettes de Charbon</option>
+            <option value="Coke de charbon" ${itemVal === "Coke de charbon" ? "selected" : ""}>Coke de charbon</option>
+        </select>
+        <input type="number" class="edit-order-item-qty" value="${qtyVal}" min="1" style="width: 50px; padding: 8px; background: var(--bg-input); border: 1px solid var(--border); color: white; border-radius: 4px;">
+        <input type="number" class="edit-order-item-price" step="0.01" value="${priceVal}" style="width: 60px; padding: 8px; background: var(--bg-input); border: 1px solid var(--border); color: white; border-radius: 4px;">
+        <button type="button" onclick="this.parentElement.remove()" style="background: transparent; border: 1px solid var(--danger); color: var(--danger); padding: 8px 10px; cursor: pointer; border-radius: 4px;"><i class="fa-solid fa-trash"></i></button>
+    `;
+  container.appendChild(row);
+}
+
+function closeEditOrderModal() {
+  document.getElementById("edit-order-modal").style.display = "none";
+}
+
+async function saveEditedOrder() {
+  const id = document.getElementById("edit-ord-id").value;
+  const client_name = document.getElementById("edit-ord-client").value.trim();
+  const deadline = document.getElementById("edit-ord-deadline").value || null;
+  const delivery_time =
+    document.getElementById("edit-ord-time").value.trim() || null;
+  const note = document.getElementById("edit-ord-note").value.trim() || null;
+
+  const rows = document.querySelectorAll(".edit-order-item-row");
+  let items = [];
+  rows.forEach((row) => {
+    const item_type = row.querySelector(".edit-order-item-select").value;
+    const quantity = parseFloat(
+      row.querySelector(".edit-order-item-qty").value,
+    );
+    const unit_price = parseFloat(
+      row.querySelector(".edit-order-item-price").value,
+    );
+    if (quantity > 0) {
+      items.push({ item_type, quantity, unit_price });
+    }
+  });
+
+  if (items.length === 0)
+    return showPopup("Erreur", "Veuillez ajouter au moins un article.");
+
+  const { error } = await db
+    .from("orders")
+    .update({ client_name, deadline, delivery_time, note, items })
+    .eq("id", id);
+
+  if (error) showPopup("Erreur", error.message);
+  else {
+    showToast("Commande modifiée !", "success");
+    closeEditOrderModal();
+    loadOrders();
+    loadOrderRequirements();
+  }
+}
+
+// ==========================================
+// --- LE RESTE DU CODE EST INCHANGÉ ---
+// ==========================================
 async function honorOrder(id, client_name, itemsJson) {
   const items =
     typeof itemsJson === "string" ? JSON.parse(itemsJson) : itemsJson;
-
   for (const item of items) {
     const { data: stock } = await db
       .from("stocks")
@@ -260,13 +409,12 @@ async function honorOrder(id, client_name, itemsJson) {
       .eq("item_name", item.item_type)
       .single();
     if (stock && stock.quantity < item.quantity) {
-      return showPopup(
-        "Stock Insuffisant",
-        `Il manque du ${item.item_type} (Besoin: ${item.quantity}, En stock: ${stock.quantity}).`,
+      return showToast(
+        `Stock insuffisant pour ${item.item_type} (Besoin: ${item.quantity}, Stock: ${stock.quantity})`,
+        "danger",
       );
     }
   }
-
   showConfirm(
     "Honorer la commande",
     `Créer les transactions et déduire le stock pour ${client_name} ?`,
@@ -279,18 +427,12 @@ async function honorOrder(id, client_name, itemsJson) {
         unit_price: item.unit_price,
         created_by: currentUser.id,
       }));
-
       const { error: tErr } = await db
         .from("transactions")
         .insert(transactionsToInsert);
       if (tErr) return showPopup("Erreur", tErr.message);
-
       await db.from("orders").delete().eq("id", id);
-
-      showPopup(
-        "Commande Honorée",
-        "Les ventes ont été enregistrées et le stock mis à jour !",
-      );
+      showToast("Commande honorée, stock mis à jour !", "success");
       loadOrders();
       loadStock();
       loadOrderRequirements();
@@ -306,31 +448,21 @@ async function honorOrder(id, client_name, itemsJson) {
 async function cancelOrder(id) {
   showConfirm("Annuler", "Annuler cette commande ?", async () => {
     await db.from("orders").delete().eq("id", id);
+    showToast("Commande annulée", "info");
     loadOrders();
-    loadOrderRequirements(); // Mise à jour des besoins
+    loadOrderRequirements();
   });
 }
 
-// ==========================================
-// --- CALCUL DES BESOINS DE COMMANDES ---
-// ==========================================
 async function loadOrderRequirements() {
   const { data: orders } = await db.from("orders").select("items");
   const { data: stocks } = await db
     .from("stocks")
     .select("item_name, quantity");
-
   const tbody = document.getElementById("order-requirements-body");
   if (!tbody) return;
-
   let requirements = {};
-
-  // Initialiser les besoins à 0 pour toutes les ressources en stock
-  if (stocks) {
-    stocks.forEach((s) => (requirements[s.item_name] = 0));
-  }
-
-  // Additionner les quantités demandées dans les commandes
+  if (stocks) stocks.forEach((s) => (requirements[s.item_name] = 0));
   if (orders) {
     orders.forEach((o) => {
       if (o.items && Array.isArray(o.items)) {
@@ -341,50 +473,32 @@ async function loadOrderRequirements() {
       }
     });
   }
-
   tbody.innerHTML = "";
   let hasRequirements = false;
-
   Object.keys(requirements).forEach((itemName) => {
     const needed = requirements[itemName];
     if (needed > 0) {
       hasRequirements = true;
       const stockItem = stocks.find((s) => s.item_name === itemName);
       const inStock = stockItem ? stockItem.quantity : 0;
-
-      let statusHtml = "";
-      if (inStock >= needed) {
-        statusHtml = `<span class="text-success"><i class="fa-solid fa-check"></i> Suffisant</span>`;
-      } else {
-        statusHtml = `<span class="text-danger"><i class="fa-solid fa-xmark"></i> Manque ${needed - inStock}</span>`;
-      }
-
+      let statusHtml =
+        inStock >= needed
+          ? `<span class="text-success"><i class="fa-solid fa-check"></i> Suffisant</span>`
+          : `<span class="text-danger"><i class="fa-solid fa-xmark"></i> Manque ${needed - inStock}</span>`;
       const color = typeColors[itemName] || "#888";
-
-      tbody.innerHTML += `
-                <tr>
-                    <td><span class="badge-type" style="background-color: ${color}; color: #fff;">${itemName}</span></td>
-                    <td style="font-weight: bold; font-size: 1.1em; color: var(--warning);">${needed}</td>
-                    <td style="font-weight: bold; font-size: 1.1em;">${inStock}</td>
-                    <td>${statusHtml}</td>
-                </tr>
-            `;
+      const textColor = itemName === "Charbon Normale" ? "#333" : "#fff";
+      tbody.innerHTML += `<tr><td><span class="badge-type" style="background-color: ${color}; color: ${textColor};">${itemName}</span></td><td style="font-weight: bold; color: var(--warning);">${needed}</td><td style="font-weight: bold;">${inStock}</td><td>${statusHtml}</td></tr>`;
     }
   });
-
   if (!hasRequirements) {
     tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state"><i class="fa-solid fa-check-double"></i><p>Aucun besoin. Toutes les commandes sont honorées.</p></div></td></tr>`;
   }
 }
 
-// ==========================================
-// --- GESTION DES PÉRIODES ---
-// ==========================================
 function changePeriod(val) {
   currentPeriod = val;
   loadPatronData();
 }
-
 function getFilteredTransactions(transactions) {
   if (currentPeriod === "all" || !transactions) return transactions || [];
   const now = new Date();
@@ -394,7 +508,6 @@ function getFilteredTransactions(transactions) {
   sevenDaysAgo.setHours(0, 0, 0, 0);
   const currentMonth = now.getMonth();
   const currentYear = now.getFullYear();
-
   return transactions.filter((t) => {
     const d = new Date(t.created_at);
     if (currentPeriod === "today") return t.created_at.startsWith(todayStr);
@@ -405,9 +518,6 @@ function getFilteredTransactions(transactions) {
   });
 }
 
-// ==========================================
-// --- AUTHENTIFICATION & INITIALISATION ---
-// ==========================================
 async function register() {
   const pseudo = document.getElementById("reg-pseudo").value.trim();
   const password = document.getElementById("reg-password").value;
@@ -464,7 +574,6 @@ async function checkUserStatus() {
   }
   userProfile = profile;
   document.getElementById("user-display-name").innerText = profile.full_name;
-
   let roleText = "Employé";
   if (profile.role === "patron") roleText = "Patron";
   if (profile.role === "contremaitre") roleText = "Contremaître";
@@ -553,11 +662,17 @@ function setupRealtime() {
     )
     .on(
       "postgres_changes",
-      { event: "*", schema: "public", table: "stocks" },
-      () => {
+      { event: "UPDATE", schema: "public", table: "stocks" },
+      (payload) => {
         if (!isTyping()) {
           loadStock();
           loadOrderRequirements();
+        }
+        if (payload.new && payload.new.quantity <= 20) {
+          showToast(
+            `⚠️ Stock critique : ${payload.new.item_name} (${payload.new.quantity} restants)`,
+            "warning",
+          );
         }
       },
     )
@@ -584,7 +699,28 @@ function setupRealtime() {
     )
     .on(
       "postgres_changes",
-      { event: "*", schema: "public", table: "orders" },
+      { event: "INSERT", schema: "public", table: "orders" },
+      () => {
+        if (!isTyping()) {
+          loadOrders();
+          loadOrderRequirements();
+        }
+        showToast("Nouvelle commande reçue !", "info");
+      },
+    )
+    .on(
+      "postgres_changes",
+      { event: "UPDATE", schema: "public", table: "orders" },
+      () => {
+        if (!isTyping()) {
+          loadOrders();
+          loadOrderRequirements();
+        }
+      },
+    )
+    .on(
+      "postgres_changes",
+      { event: "DELETE", schema: "public", table: "orders" },
       () => {
         if (!isTyping()) {
           loadOrders();
@@ -595,9 +731,6 @@ function setupRealtime() {
     .subscribe();
 }
 
-// ==========================================
-// --- TRÉSORERIE (PATRON) ---
-// ==========================================
 async function loadTreasury() {
   if (!userProfile || userProfile.role !== "patron") return;
   const { data: transactions } = await db.from("transactions").select("*");
@@ -652,6 +785,7 @@ async function updateTreasuryDirect(input) {
         showPopup("Erreur", error.message);
         loadTreasury();
       } else {
+        showToast("Trésorerie ajustée", "success");
         loadTreasury();
         loadPatronData();
       }
@@ -679,7 +813,7 @@ async function adjustTreasury(type) {
         });
       if (error) showPopup("Erreur", error.message);
       else {
-        showPopup("Succès", `${amount} S ${action.toLowerCase()}s.`);
+        showToast(`${amount} S ${action.toLowerCase()}s.`, "success");
         document.getElementById("manual-amount").value = "";
         loadTreasury();
         loadPatronData();
@@ -688,9 +822,6 @@ async function adjustTreasury(type) {
   );
 }
 
-// ==========================================
-// --- GESTION DU STOCK ---
-// ==========================================
 async function loadStock() {
   const { data: stocks, error } = await db
     .from("stocks")
@@ -717,7 +848,7 @@ async function loadStock() {
                     </div>
                 </div>`
           : "";
-      container.innerHTML += `<div class="stock-item" style="border-left-color: ${color};"><h4 style="background-color: ${color}; color: #fff;">${s.item_name}</h4><div class="qty">${s.quantity}</div>${controls}</div>`;
+      container.innerHTML += `<div class="stock-item" style="border-left-color: ${color};"><h4 style="background-color: ${color}; color: ${s.item_name === "Charbon Normale" ? "#333" : "#fff"};">${s.item_name}</h4><div class="qty">${s.quantity}</div>${controls}</div>`;
     });
   } else {
     container.innerHTML = `<div class="empty-state"><p>Stock vide.</p></div>`;
@@ -735,9 +866,6 @@ async function adjustStock(id, currentQty, op) {
   loadStock();
 }
 
-// ==========================================
-// --- SAISIE DIRECTE ---
-// ==========================================
 function updateBasePrice() {
   const type = document.getElementById("emp-type").value;
   const select = document.getElementById("emp-item");
@@ -785,9 +913,9 @@ async function addTransaction(e) {
       .eq("item_name", item_type)
       .single();
     if (stock && stock.quantity < quantity)
-      return showPopup(
-        "Stock Insuffisant",
-        `Il ne reste que ${stock.quantity}.`,
+      return showToast(
+        `Stock insuffisant pour ${item_type} (${stock.quantity} restants)`,
+        "danger",
       );
   }
   const { error } = await db
@@ -802,7 +930,7 @@ async function addTransaction(e) {
     });
   if (error) showPopup("Erreur", error.message);
   else {
-    showPopup("Succès", "Enregistré !");
+    showToast("Opération enregistrée !", "success");
     document.getElementById("emp-custom-item").value = "";
     document.getElementById("emp-quantity").value = 1;
     loadEmployeData();
@@ -814,9 +942,6 @@ async function addTransaction(e) {
   }
 }
 
-// ==========================================
-// --- VUE GESTION (PATRON) ---
-// ==========================================
 async function loadPatronData() {
   const { data: personnel, error } = await db
     .from("profiles")
@@ -889,6 +1014,7 @@ async function loadPatronData() {
       else if (t.type === "salaire") tS += cost;
       else if (t.type === "vente") tV += cost;
       const color = typeColors[t.item_type] || "#888";
+      const textColor = t.item_type === "Charbon Normale" ? "#333" : "#fff";
       let bC = "bg-secondary",
         tC = "text-muted";
       if (t.type === "vente") {
@@ -907,7 +1033,7 @@ async function loadPatronData() {
         bC = "bg-blue";
         tC = cost >= 0 ? "text-success" : "text-danger";
       }
-      tbody.innerHTML += `<tr><td>${new Date(t.created_at).toLocaleDateString()}</td><td>${t.counterparty_name}</td><td><span class="badge-type ${bC}" style="${t.type === "ajustement" ? "background-color: #3b82f6; color: white;" : ""}">${t.type.toUpperCase()}</span></td><td><span class="badge-type" style="background-color: ${color}; color: #fff;">${t.item_type}</span></td><td>${t.quantity}</td><td>${parseFloat(t.unit_price).toFixed(2)} S</td><td class="${tC}">${Math.round(cost)} S</td><td><button class="btn-icon text-danger" onclick="deleteTransaction(${t.id})"><i class="fa-solid fa-trash"></i></button></td></tr>`;
+      tbody.innerHTML += `<tr><td>${new Date(t.created_at).toLocaleDateString()}</td><td>${t.counterparty_name}</td><td><span class="badge-type ${bC}" style="${t.type === "ajustement" ? "background-color: #3b82f6; color: white;" : ""}">${t.type.toUpperCase()}</span></td><td><span class="badge-type" style="background-color: ${color}; color: ${textColor};">${t.item_type}</span></td><td>${t.quantity}</td><td>${parseFloat(t.unit_price).toFixed(2)} S</td><td class="${tC}">${Math.round(cost)} S</td><td><button class="btn-icon text-danger" onclick="deleteTransaction(${t.id})"><i class="fa-solid fa-trash"></i></button></td></tr>`;
     });
     const tD = tA + tS;
     document.getElementById("stat-ventes").innerText = Math.round(tV) + " S";
@@ -1035,6 +1161,7 @@ async function showUserHistory(userId, userName) {
     transactions.forEach((t) => {
       const cost = t.quantity * t.unit_price;
       const color = typeColors[t.item_type] || "#888";
+      const textColor = t.item_type === "Charbon Normale" ? "#333" : "#fff";
       let bC =
         t.type === "vente"
           ? "bg-green"
@@ -1042,7 +1169,7 @@ async function showUserHistory(userId, userName) {
             ? "bg-purple"
             : "bg-red";
       if (t.type === "ajustement") bC = "bg-blue";
-      tbody.innerHTML += `<tr><td>${new Date(t.created_at).toLocaleDateString()}</td><td><span class="badge-type ${bC}">${t.type.toUpperCase()}</span></td><td><span class="badge-type" style="background-color: ${color}; color: #fff;">${t.item_type}</span></td><td>${t.quantity}</td><td>${parseFloat(t.unit_price).toFixed(2)} S</td><td class="${t.type === "vente" ? "text-success" : "text-danger"}">${Math.round(cost)} Septims</td></tr>`;
+      tbody.innerHTML += `<tr><td>${new Date(t.created_at).toLocaleDateString()}</td><td><span class="badge-type ${bC}">${t.type.toUpperCase()}</span></td><td><span class="badge-type" style="background-color: ${color}; color: ${textColor};">${t.item_type}</span></td><td>${t.quantity}</td><td>${parseFloat(t.unit_price).toFixed(2)} S</td><td class="${t.type === "vente" ? "text-success" : "text-danger"}">${Math.round(cost)} Septims</td></tr>`;
     });
   } else {
     tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><p>Aucune transaction.</p></div></td></tr>`;
@@ -1063,26 +1190,27 @@ function updateSalaryTotal() {
 
 async function validerUtilisateur(id) {
   await db.from("profiles").update({ is_approved: true }).eq("id", id);
-  showPopup("Validé", "Le joueur peut travailler.");
+  showToast("Joueur validé !", "success");
   loadPatronData();
 }
 async function changerRole(id, role) {
   showConfirm("Changement", `Nommer cet utilisateur ${role} ?`, async () => {
     await db.from("profiles").update({ role: role }).eq("id", id);
-    showPopup("Succès", `Rôle mis à jour.`);
+    showToast("Rôle mis à jour.", "success");
     loadPatronData();
   });
 }
 async function virerUtilisateur(id, nom) {
   showConfirm("Virer", `VIRER ${nom} ?`, async () => {
     await db.rpc("supprimer_utilisateur", { target_user_id: id });
-    showPopup("Viré", `${nom} supprimé.`);
+    showToast(`${nom} supprimé.`, "info");
     loadPatronData();
   });
 }
 async function deleteTransaction(id) {
   showConfirm("Supprimer", "Supprimer cette transaction ?", async () => {
     await db.from("transactions").delete().eq("id", id);
+    showToast("Transaction supprimée", "info");
     loadPatronData();
     loadEmployeData();
     loadTreasury();
@@ -1120,7 +1248,7 @@ async function paySalaries() {
       for (const up of u)
         await db.from("profiles").update({ salary: up.salary }).eq("id", up.id);
       await db.from("transactions").insert(tI);
-      showPopup("Payé", `${totalPaye} S distribués.`);
+      showToast(`${totalPaye} S distribués.`, "success");
       loadPatronData();
       loadEmployeData();
       loadTreasury();
@@ -1128,9 +1256,6 @@ async function paySalaries() {
   );
 }
 
-// ==========================================
-// --- TONNEAUX ---
-// ==========================================
 async function loadBarrels() {
   const { data: rentals } = await db.from("barrel_rentals").select("*");
   const container = document.querySelector("#tab-location .barrels-grid");
@@ -1213,7 +1338,7 @@ async function confirmAllocateBarrel() {
       client_name: cN,
       price: p,
     });
-  showPopup("Succès", `Tonneau alloué.`);
+  showToast("Tonneau alloué.", "success");
   closeAllocateModal();
   loadBarrels();
 }
@@ -1255,7 +1380,7 @@ async function payBarrel(id, num, cN) {
         unit_price: fp,
         created_by: currentUser.id,
       });
-    showPopup("Payé", `${fp} S encaissés.`);
+    showToast(`${fp} S encaissés.`, "success");
     loadBarrels();
     if (userProfile.role === "patron") {
       loadPatronData();
@@ -1266,13 +1391,11 @@ async function payBarrel(id, num, cN) {
 async function freeBarrel(id) {
   showConfirm("Libérer", "Libérer ?", async () => {
     await db.from("barrel_rentals").delete().eq("id", id);
+    showToast("Tonneau libéré.", "info");
     loadBarrels();
   });
 }
 
-// ==========================================
-// --- FOURS ---
-// ==========================================
 async function loadFurnaces() {
   const { data: furnaces } = await db
     .from("furnace_rentals")
@@ -1331,7 +1454,7 @@ async function confirmCreateFurnace() {
   await db
     .from("furnace_rentals")
     .insert({ client_name: cN, created_by: currentUser.id });
-  showPopup("Succès", `Ajouté.`);
+  showToast("Client ajouté.", "success");
   closeFurnaceModal();
   loadFurnaces();
 }
@@ -1351,7 +1474,7 @@ async function payFurnace(id, cN) {
         unit_price: 30,
         created_by: currentUser.id,
       });
-    showPopup("Payé", `30 S encaissés.`);
+    showToast("30 S encaissés.", "success");
     loadFurnaces();
     if (userProfile.role === "patron") {
       loadPatronData();
@@ -1363,6 +1486,7 @@ async function payFurnace(id, cN) {
 async function freeFurnace(id) {
   showConfirm("Libérer", "Supprimer ?", async () => {
     await db.from("furnace_rentals").delete().eq("id", id);
+    showToast("Client retiré.", "info");
     loadFurnaces();
   });
 }
@@ -1381,6 +1505,7 @@ async function loadEmployeData() {
     data.forEach((t) => {
       const cost = t.quantity * t.unit_price,
         color = typeColors[t.item_type] || "#888";
+      const textColor = t.item_type === "Charbon Normale" ? "#333" : "#fff";
       let bC =
         t.type === "vente"
           ? "bg-green"
@@ -1388,7 +1513,7 @@ async function loadEmployeData() {
             ? "bg-purple"
             : "bg-red";
       if (t.type === "ajustement") bC = "bg-blue";
-      tbody.innerHTML += `<tr><td>${new Date(t.created_at).toLocaleDateString()}</td><td><span class="badge-type ${bC}">${t.type.toUpperCase()}</span></td><td><span class="badge-type" style="background-color: ${color}; color: #fff;">${t.item_type}</span></td><td>${t.quantity}</td><td>${parseFloat(t.unit_price).toFixed(2)} S</td><td class="${t.type === "vente" ? "text-success" : "text-danger"}">${Math.round(cost)} Septims</td></tr>`;
+      tbody.innerHTML += `<tr><td>${new Date(t.created_at).toLocaleDateString()}</td><td><span class="badge-type ${bC}">${t.type.toUpperCase()}</span></td><td><span class="badge-type" style="background-color: ${color}; color: ${textColor};">${t.item_type}</span></td><td>${t.quantity}</td><td>${parseFloat(t.unit_price).toFixed(2)} S</td><td class="${t.type === "vente" ? "text-success" : "text-danger"}">${Math.round(cost)} Septims</td></tr>`;
     });
   } else {
     tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><p>Aucune opération.</p></div></td></tr>`;

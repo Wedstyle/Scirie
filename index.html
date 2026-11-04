@@ -120,6 +120,21 @@
               onclick="switchTab('tab-commandes', this)"
             >
               <i class="fa-solid fa-scroll"></i> Commandes
+              <span
+                id="orders-count"
+                style="
+                  display: none;
+                  background: var(--danger);
+                  color: white;
+                  border-radius: 20px;
+                  padding: 2px 8px;
+                  font-size: 0.75em;
+                  margin-left: auto;
+                  font-family: &quot;Inter&quot;;
+                  font-weight: bold;
+                "
+                >0</span
+              >
             </button>
             <button class="nav-btn" onclick="switchTab('tab-stock', this)">
               <i class="fa-solid fa-boxes-stacked"></i> Stock
@@ -164,7 +179,6 @@
             <section id="tab-commandes" class="tab-content active">
               <h2 class="page-title">Bons de Commande</h2>
               <div class="grid-layout" style="grid-template-columns: 400px 1fr">
-                <!-- Formulaire de création -->
                 <div class="card" style="height: fit-content">
                   <h3><i class="fa-solid fa-plus"></i> Nouvelle Commande</h3>
                   <form id="order-form" onsubmit="createOrder(event)">
@@ -192,7 +206,6 @@
                       </div>
                     </div>
 
-                    <!-- Liste des articles -->
                     <div
                       style="
                         border-top: 1px solid var(--border);
@@ -225,9 +238,7 @@
                           <i class="fa-solid fa-plus"></i> Ajouter
                         </button>
                       </div>
-                      <div id="order-items-container">
-                        <!-- Les lignes d'articles seront ajoutées ici par JS -->
-                      </div>
+                      <div id="order-items-container"></div>
                     </div>
 
                     <div class="input-group mb-15">
@@ -255,7 +266,6 @@
                   </form>
                 </div>
 
-                <!-- Liste des commandes -->
                 <div class="card">
                   <h3>Commandes en attente</h3>
                   <div
@@ -394,7 +404,6 @@
                 <div class="stock-grid" id="stock-container"></div>
               </div>
 
-              <!-- NOUVEAU : Besoins pour les Commandes -->
               <div class="card" style="border: 1px solid var(--warning)">
                 <h3 style="color: var(--warning)">
                   <i class="fa-solid fa-triangle-exclamation"></i> Besoins pour
@@ -1016,6 +1025,112 @@
         <button class="btn-primary" onclick="closeUserHistory()">Fermer</button>
       </div>
     </div>
+
+    <!-- NOUVELLE MODALE : MODIFIER UNE COMMANDE -->
+    <div id="edit-order-modal" class="modal-overlay">
+      <div
+        class="modal-box"
+        style="max-width: 600px; width: 95%; text-align: left"
+      >
+        <h3 style="text-align: center; color: var(--warning)">
+          Modifier la Commande
+        </h3>
+        <input type="hidden" id="edit-ord-id" />
+
+        <div style="display: flex; gap: 15px; margin-bottom: 15px">
+          <div class="input-group" style="flex: 1; margin: 0">
+            <label>Nom du Client</label>
+            <input type="text" id="edit-ord-client" required />
+          </div>
+          <div class="input-group" style="width: 140px; margin: 0">
+            <label>Date</label>
+            <input type="date" id="edit-ord-deadline" />
+          </div>
+          <div class="input-group" style="width: 100px; margin: 0">
+            <label>Heure</label>
+            <input type="text" id="edit-ord-time" placeholder="20h00" />
+          </div>
+        </div>
+
+        <div
+          style="
+            border-top: 1px solid var(--border);
+            padding-top: 15px;
+            margin-bottom: 15px;
+          "
+        >
+          <div
+            style="
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              margin-bottom: 10px;
+            "
+          >
+            <label style="margin: 0; font-weight: bold; color: var(--primary)"
+              >Articles</label
+            >
+            <button
+              type="button"
+              class="btn-secondary"
+              onclick="addEditItemRow()"
+              style="padding: 4px 8px; font-size: 0.8em"
+            >
+              <i class="fa-solid fa-plus"></i> Ajouter
+            </button>
+          </div>
+          <div id="edit-order-items-container"></div>
+        </div>
+
+        <div class="input-group mb-15">
+          <label>Note</label>
+          <textarea
+            id="edit-ord-note"
+            style="
+              width: 100%;
+              padding: 10px;
+              background: var(--bg-input);
+              border: 1px solid var(--border);
+              color: white;
+              border-radius: 4px;
+              font-family: &quot;Inter&quot;;
+              min-height: 50px;
+            "
+          ></textarea>
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-top: 20px">
+          <button
+            class="btn-secondary"
+            onclick="closeEditOrderModal()"
+            style="flex: 1"
+          >
+            Annuler
+          </button>
+          <button
+            class="btn-primary"
+            onclick="saveEditedOrder()"
+            style="flex: 1"
+          >
+            Sauvegarder
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONTENEUR DE NOTIFICATIONS TOASTS -->
+    <div
+      id="toast-container"
+      style="
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 9999;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      "
+    ></div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="app.js"></script>

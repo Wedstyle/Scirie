@@ -1222,3 +1222,109 @@ header {
 .barrel-price-input[type="number"] {
   -moz-appearance: textfield;
 }
+/* =========================================
+   NOTIFICATIONS TOASTS
+   ========================================= */
+.toast {
+  background: var(--bg-card);
+  color: var(--text-main);
+  padding: 12px 20px;
+  border-radius: 6px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: "Inter", sans-serif;
+  font-size: 0.95em;
+  min-width: 250px;
+  max-width: 350px;
+  border-left: 4px solid var(--primary);
+  animation: slideIn 0.3s ease-out forwards;
+  opacity: 0;
+  transform: translateX(100%);
+}
+
+.toast.hiding {
+  animation: slideOut 0.3s ease-in forwards;
+}
+
+/* Couleurs selon le type de notification */
+.toast-success {
+  border-left-color: var(--success);
+}
+.toast-success i {
+  color: var(--success);
+}
+
+.toast-warning {
+  border-left-color: var(--warning);
+}
+.toast-warning i {
+  color: var(--warning);
+}
+
+.toast-danger {
+  border-left-color: var(--danger);
+}
+.toast-danger i {
+  color: var(--danger);
+}
+
+.toast-info {
+  border-left-color: var(--primary);
+}
+.toast-info i {
+  color: var(--primary);
+}
+
+.toast i {
+  font-size: 1.2em;
+}
+
+@keyframes slideIn {
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideOut {
+  to {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+}
+
+/* =========================================
+   BADGE COMPTEUR COMMANDES
+   ========================================= */
+#orders-count {
+  animation: pulseBadge 2s infinite;
+}
+
+@keyframes pulseBadge {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+/* =========================================
+   BADGES DE RESSOURCES
+   ========================================= */
+.badge-type {
+  padding: 6px 12px;
+  border-radius: 4px; /* Bords légèrement arrondis */
+  font-weight: 700;
+  font-size: 0.85em;
+  display: inline-block;
+  font-family: "Inter", sans-serif;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); /* Petite ombre pour décoller du fond */
+  border: 1px solid rgba(255, 255, 255, 0.1); /* Bordure très fine */
+  text-align: center;
+  min-width: 100px; /* Largeur minimale pour que ce soit régulier */
+}
