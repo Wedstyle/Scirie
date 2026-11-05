@@ -98,7 +98,6 @@
     <!-- APPLICATION PRINCIPALE -->
     <div id="app-screen" style="display: none">
       <header>
-        <!-- Bouton Burger (visible uniquement sur mobile) -->
         <button class="burger-menu" onclick="toggleSidebar()">
           <i class="fa-solid fa-bars"></i>
         </button>
@@ -117,7 +116,6 @@
         </div>
       </header>
 
-      <!-- Overlay sombre pour fermer le menu sur mobile -->
       <div id="sidebar-overlay" onclick="toggleSidebar()"></div>
 
       <div class="layout">
@@ -441,6 +439,7 @@
                         <th>Ressource</th>
                         <th>Besoin Total</th>
                         <th>En Stock</th>
+                        <th>Stock Projeté</th>
                         <th>Statut</th>
                       </tr>
                     </thead>
@@ -871,7 +870,6 @@
                         <tbody id="admin-history-body"></tbody>
                       </table>
                     </div>
-                    <!-- NOUVEAU : Bouton Voir Plus -->
                     <div style="text-align: center; margin-top: 15px">
                       <button
                         id="btn-load-more"
@@ -1073,7 +1071,6 @@
       </div>
     </div>
 
-    <!-- NOUVELLE MODALE : MODIFIER UNE COMMANDE -->
     <div id="edit-order-modal" class="modal-overlay">
       <div
         class="modal-box"
@@ -1165,7 +1162,6 @@
       </div>
     </div>
 
-    <!-- CONTENEUR DE NOTIFICATIONS TOASTS -->
     <div
       id="toast-container"
       style="

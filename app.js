@@ -215,14 +215,16 @@ async function createOrder(e) {
   if (items.length === 0)
     return showPopup("Erreur", "Veuillez ajouter au moins un article.");
 
-  const { error } = await db.from("orders").insert({
-    client_name,
-    items,
-    delivery_time,
-    deadline,
-    note,
-    created_by: currentUser.id,
-  });
+  const { error } = await db
+    .from("orders")
+    .insert({
+      client_name,
+      items,
+      delivery_time,
+      deadline,
+      note,
+      created_by: currentUser.id,
+    });
   if (error) showPopup("Erreur", error.message);
   else {
     showToast("Commande créée !", "success");
@@ -411,7 +413,6 @@ async function saveEditedOrder() {
   const delivery_time =
     document.getElementById("edit-ord-time").value.trim() || null;
   const note = document.getElementById("edit-ord-note").value.trim() || null;
-
   const rows = document.querySelectorAll(".edit-order-item-row");
   let items = [];
   rows.forEach((row) => {
@@ -424,11 +425,9 @@ async function saveEditedOrder() {
     );
     if (quantity > 0) items.push({ item_type, quantity, unit_price });
   });
-
   if (items.length === 0)
     return showPopup("Erreur", "Veuillez ajouter au moins un article.");
 
-  // La modification avec .select() pour vérifier que ça a bien marché
   const { data, error } = await db
     .from("orders")
     .update({ client_name, deadline, delivery_time, note, items })
@@ -441,7 +440,7 @@ async function saveEditedOrder() {
   } else if (!data || data.length === 0) {
     showPopup(
       "Erreur",
-      "Impossible de modifier la commande. Vérifiez les règles de sécurité (RLS) dans Supabase.",
+      "Impossible de modifier. Vérifiez les règles RLS dans Supabase.",
     );
   } else {
     showToast("Commande modifiée !", "success");
@@ -452,7 +451,7 @@ async function saveEditedOrder() {
 }
 
 // ==========================================
-// --- BESOINS COMMANDES ---
+// --- BESOINS & PROJECTION DES COMMANDES ---
 // ==========================================
 async function loadOrderRequirements() {
   const { data: orders } = await db.from("orders").select("items");
@@ -461,8 +460,10 @@ async function loadOrderRequirements() {
     .select("item_name, quantity");
   const tbody = document.getElementById("order-requirements-body");
   if (!tbody) return;
+
   let requirements = {};
   if (stocks) stocks.forEach((s) => (requirements[s.item_name] = 0));
+
   if (orders) {
     orders.forEach((o) => {
       if (o.items && Array.isArray(o.items)) {
@@ -473,25 +474,39 @@ async function loadOrderRequirements() {
       }
     });
   }
+
   tbody.innerHTML = "";
   let hasRequirements = false;
+
   Object.keys(requirements).forEach((itemName) => {
     const needed = requirements[itemName];
     if (needed > 0) {
       hasRequirements = true;
       const stockItem = stocks.find((s) => s.item_name === itemName);
       const inStock = stockItem ? stockItem.quantity : 0;
+      const projected = inStock - needed;
+
       let statusHtml =
-        inStock >= needed
+        projected >= 0
           ? `<span class="text-success"><i class="fa-solid fa-check"></i> Suffisant</span>`
-          : `<span class="text-danger"><i class="fa-solid fa-xmark"></i> Manque ${needed - inStock}</span>`;
+          : `<span class="text-danger"><i class="fa-solid fa-xmark"></i> Manque ${Math.abs(projected)}</span>`;
+
       const color = typeColors[itemName] || "#888";
       const textColor = itemName === "Charbon Normale" ? "#333" : "#fff";
-      tbody.innerHTML += `<tr><td><span class="badge-type" style="background-color: ${color}; color: ${textColor};">${itemName}</span></td><td style="font-weight: bold; color: var(--warning);">${needed}</td><td style="font-weight: bold;">${inStock}</td><td>${statusHtml}</td></tr>`;
+      const badgeClass = projected >= 0 ? "positive" : "negative";
+
+      tbody.innerHTML += `
+                <tr>
+                    <td><span class="badge-type" style="background-color: ${color}; color: ${textColor};">${itemName}</span></td>
+                    <td style="font-weight: bold; color: var(--warning);">${needed}</td>
+                    <td style="font-weight: bold;">${inStock}</td>
+                    <td><span class="badge-projete ${badgeClass}">${projected}</span></td>
+                    <td>${statusHtml}</td>
+                </tr>`;
     }
   });
   if (!hasRequirements)
-    tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state"><i class="fa-solid fa-check-double"></i><p>Aucun besoin. Toutes les commandes sont honorées.</p></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state"><i class="fa-solid fa-check-double"></i><p>Aucun besoin. Toutes les commandes sont honorées.</p></div></td></tr>`;
 }
 
 // ==========================================
@@ -780,14 +795,16 @@ async function updateTreasuryDirect(input) {
     "Modification directe",
     `Ajuster de ${diff > 0 ? "+" : ""}${diff} S ?`,
     async () => {
-      const { error } = await db.from("transactions").insert({
-        type: "ajustement",
-        item_type: "Ajustement",
-        counterparty_name: "Modification directe",
-        quantity: 1,
-        unit_price: diff,
-        created_by: currentUser.id,
-      });
+      const { error } = await db
+        .from("transactions")
+        .insert({
+          type: "ajustement",
+          item_type: "Ajustement",
+          counterparty_name: "Modification directe",
+          quantity: 1,
+          unit_price: diff,
+          created_by: currentUser.id,
+        });
       if (error) {
         showPopup("Erreur", error.message);
         loadTreasury();
@@ -808,14 +825,16 @@ async function adjustTreasury(type) {
     `Ajustement`,
     `Voulez-vous ${action.toLowerCase()} ${amount} S ?`,
     async () => {
-      const { error } = await db.from("transactions").insert({
-        type: "ajustement",
-        item_type: "Ajustement",
-        counterparty_name: `Manuel (${action})`,
-        quantity: 1,
-        unit_price: type === 1 ? amount : -amount,
-        created_by: currentUser.id,
-      });
+      const { error } = await db
+        .from("transactions")
+        .insert({
+          type: "ajustement",
+          item_type: "Ajustement",
+          counterparty_name: `Manuel (${action})`,
+          quantity: 1,
+          unit_price: type === 1 ? amount : -amount,
+          created_by: currentUser.id,
+        });
       if (error) showPopup("Erreur", error.message);
       else {
         await addLog("Trésorerie", `${action} manuel de ${amount} S.`);
@@ -833,16 +852,43 @@ async function loadStock() {
     .from("stocks")
     .select("*")
     .order("id");
+
+  const { data: orders } = await db.from("orders").select("items");
+  let requirements = {};
+  if (orders) {
+    orders.forEach((o) => {
+      if (o.items && Array.isArray(o.items)) {
+        o.items.forEach((item) => {
+          requirements[item.item_type] =
+            (requirements[item.item_type] || 0) + item.quantity;
+        });
+      }
+    });
+  }
+
   const container = document.getElementById("stock-container");
   if (!container) return;
   container.innerHTML = "";
+
   if (error) {
     container.innerHTML = `<p class="text-danger">Erreur.</p>`;
     return;
   }
+
   if (stocks && stocks.length > 0) {
     stocks.forEach((s) => {
       const color = typeColors[s.item_name] || "#888";
+      const needed = requirements[s.item_name] || 0;
+      const projected = s.quantity - needed;
+
+      let projectedHtml = "";
+      if (needed > 0) {
+        const badgeClass = projected >= 0 ? "positive" : "negative";
+        projectedHtml = `<div class="badge-projete ${badgeClass}">Projeté : ${projected}</div>`;
+      } else {
+        projectedHtml = `<div class="badge-projete neutral">Projeté : ${projected}</div>`;
+      }
+
       const controls =
         userProfile.role === "patron"
           ? `
@@ -854,12 +900,20 @@ async function loadStock() {
                     </div>
                 </div>`
           : "";
-      container.innerHTML += `<div class="stock-item" style="border-left-color: ${color};"><h4 style="background-color: ${color}; color: ${s.item_name === "Charbon Normale" ? "#333" : "#fff"};">${s.item_name}</h4><div class="qty">${s.quantity}</div>${controls}</div>`;
+
+      container.innerHTML += `
+                <div class="stock-item" style="border-left-color: ${color};">
+                    <h4 style="background-color: ${color}; color: ${s.item_name === "Charbon Normale" ? "#333" : "#fff"};">${s.item_name}</h4>
+                    <div class="qty">${s.quantity}</div>
+                    ${projectedHtml}
+                    ${controls}
+                </div>`;
     });
   } else {
     container.innerHTML = `<div class="empty-state"><p>Stock vide.</p></div>`;
   }
 }
+
 async function adjustStock(id, currentQty, op, itemName) {
   const input = document.getElementById(`stock-qty-${id}`);
   const amount = parseInt(input.value);
@@ -920,14 +974,16 @@ async function addTransaction(e) {
     if (stock && stock.quantity < quantity)
       return showToast(`Stock insuffisant pour ${item_type}`, "danger");
   }
-  const { error } = await db.from("transactions").insert({
-    type,
-    item_type,
-    counterparty_name: userProfile.full_name,
-    quantity,
-    unit_price,
-    created_by: currentUser.id,
-  });
+  const { error } = await db
+    .from("transactions")
+    .insert({
+      type,
+      item_type,
+      counterparty_name: userProfile.full_name,
+      quantity,
+      unit_price,
+      created_by: currentUser.id,
+    });
   if (error) showPopup("Erreur", error.message);
   else {
     showToast("Opération enregistrée !", "success");
@@ -1107,9 +1163,9 @@ function renderCharts(transactions) {
         position: "bottom",
         labels: {
           color: "#94A3B8",
-          font: { family: "Inter", size: 11 }, // Plus petit
-          padding: 10, // Plus compact
-          boxWidth: 10, // Points plus petits
+          font: { family: "Inter", size: 11 },
+          padding: 10,
+          boxWidth: 10,
           usePointStyle: true,
           pointStyle: "circle",
         },
@@ -1197,7 +1253,6 @@ function renderCharts(transactions) {
   }
 }
 
-// ... Le reste des fonctions (modales, tonneaux, fours) reste identique ...
 async function showUserHistory(userId, userName) {
   document.getElementById("user-history-title").innerText =
     `Historique de ${userName}`;
@@ -1386,11 +1441,13 @@ async function confirmAllocateBarrel() {
   const p = parseFloat(document.getElementById("allocate-price").value) || 50;
   if (!cN) return showPopup("Erreur", "Nom invalide.");
   if (!currentBarrelToAllocate) return;
-  await db.from("barrel_rentals").insert({
-    barrel_number: currentBarrelToAllocate,
-    client_name: cN,
-    price: p,
-  });
+  await db
+    .from("barrel_rentals")
+    .insert({
+      barrel_number: currentBarrelToAllocate,
+      client_name: cN,
+      price: p,
+    });
   showToast("Tonneau alloué.", "success");
   closeAllocateModal();
   loadBarrels();
@@ -1424,14 +1481,16 @@ async function payBarrel(id, num, cN) {
       .from("barrel_rentals")
       .update({ last_payment_date: new Date().toISOString() })
       .eq("id", id);
-    await db.from("transactions").insert({
-      type: "vente",
-      item_type: "Location tonneau",
-      counterparty_name: cN,
-      quantity: 1,
-      unit_price: fp,
-      created_by: currentUser.id,
-    });
+    await db
+      .from("transactions")
+      .insert({
+        type: "vente",
+        item_type: "Location tonneau",
+        counterparty_name: cN,
+        quantity: 1,
+        unit_price: fp,
+        created_by: currentUser.id,
+      });
     showToast(`${fp} S encaissés.`, "success");
     loadBarrels();
     if (userProfile.role === "patron") {
@@ -1516,14 +1575,16 @@ async function payFurnace(id, cN) {
       .from("furnace_rentals")
       .update({ last_payment_date: new Date().toISOString() })
       .eq("id", id);
-    await db.from("transactions").insert({
-      type: "vente",
-      item_type: "Location four",
-      counterparty_name: cN,
-      quantity: 1,
-      unit_price: 30,
-      created_by: currentUser.id,
-    });
+    await db
+      .from("transactions")
+      .insert({
+        type: "vente",
+        item_type: "Location four",
+        counterparty_name: cN,
+        quantity: 1,
+        unit_price: 30,
+        created_by: currentUser.id,
+      });
     showToast("30 S encaissés.", "success");
     loadFurnaces();
     if (userProfile.role === "patron") {
