@@ -1,4 +1,5 @@
 :root {
+  /* Thème par défaut (Automne - style actuel amélioré) */
   --bg-main: #121212;
   --bg-card: #1e1e24;
   --bg-input: #0a0a0c;
@@ -14,6 +15,50 @@
   --radius: 4px;
 }
 
+/* =========================================
+   THÈMES SAISONNIERS
+   ========================================= */
+body.theme-winter {
+  --bg-main: #0f172a;
+  --bg-card: #1e293b;
+  --bg-input: #0b1120;
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --primary: #38bdf8; /* Bleu glacé */
+  --primary-hover: #7dd3fc;
+  --border: #334155;
+}
+
+body.theme-spring {
+  --bg-main: #0f1712; /* Vert forêt très sombre */
+  --bg-card: #16261d;
+  --bg-input: #0a120d;
+  --text-main: #e8f5e9;
+  --text-muted: #a5d6a7;
+  --primary: #81c784; /* Vert sauge doux */
+  --primary-hover: #a5d6a7;
+  --border: #2e4d38;
+}
+
+body.theme-summer {
+  --bg-main: #1a1410; /* Brun très sombre */
+  --bg-card: #2d2219;
+  --bg-input: #120d0a;
+  --text-main: #fff3e0;
+  --text-muted: #fcd34d; /* Jaune paille doux */
+  --primary: #ffb300; /* Ambre chaleureux */
+  --primary-hover: #ffca28;
+  --border: #4a3423;
+}
+
+body.theme-autumn {
+  /* C'est le thème par défaut défini dans :root, on le garde pour le switch */
+  --bg-main: #121212;
+  --bg-card: #1e1e24;
+  --bg-input: #0a0a0c;
+  --primary: #d4af37;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -21,7 +66,11 @@
 }
 body {
   background-color: var(--bg-main);
-  background-image: radial-gradient(circle at 50% 0%, #1a1a20 0%, #121212 100%);
+  background-image: radial-gradient(
+    circle at 50% 0%,
+    rgba(255, 255, 255, 0.03) 0%,
+    transparent 80%
+  );
   color: var(--text-main);
   height: 100vh;
   display: flex;
@@ -29,6 +78,9 @@ body {
   overflow: hidden;
   font-family: "Inter", sans-serif;
   font-size: 14px;
+  transition:
+    background-color 0.5s ease,
+    color 0.5s ease;
 }
 h1,
 h2,
@@ -61,6 +113,7 @@ h4,
   border-top: 3px solid var(--primary);
   text-align: center;
   box-shadow: 0 15px 40px rgba(0, 0, 0, 0.8);
+  transition: 0.3s;
 }
 .auth-logo {
   font-size: 3em;
@@ -85,6 +138,7 @@ h4,
   text-transform: uppercase;
   letter-spacing: 2px;
 }
+
 .input-group {
   position: relative;
   margin-bottom: 15px;
@@ -193,6 +247,7 @@ header {
   border-bottom: 2px solid var(--border);
   z-index: 10;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  transition: 0.3s;
 }
 .logo {
   font-size: 1.3em;
@@ -216,7 +271,7 @@ header {
   font-size: 0.75em;
 }
 
-/* Bouton Burger */
+/* Bouton Burger & Thème */
 .burger-menu {
   display: none;
   background: none;
@@ -225,6 +280,16 @@ header {
   font-size: 1.5em;
   cursor: pointer;
   margin-right: 15px;
+}
+.theme-selector {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  color: var(--text-main);
+  padding: 6px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: "Cinzel";
+  outline: none;
 }
 
 /* Layout */
@@ -240,7 +305,9 @@ header {
   padding: 15px 0;
   display: flex;
   flex-direction: column;
-  transition: transform 0.3s ease-in-out;
+  transition:
+    transform 0.3s ease-in-out,
+    background-color 0.5s;
   z-index: 100;
 }
 .sidebar nav {
@@ -261,6 +328,7 @@ header {
   align-items: center;
   gap: 15px;
   border-left: 3px solid transparent;
+  position: relative;
 }
 .nav-btn:hover {
   color: var(--text-main);
@@ -268,12 +336,25 @@ header {
 }
 .nav-btn.active {
   color: var(--primary);
-  background: rgba(212, 175, 55, 0.05);
+  background: rgba(255, 255, 255, 0.05);
   border-left: 3px solid var(--primary);
 }
 .nav-btn i {
   width: 20px;
   text-align: center;
+}
+
+/* Badges de navigation */
+.nav-badge {
+  background: var(--danger);
+  color: white;
+  border-radius: 20px;
+  padding: 2px 8px;
+  font-size: 0.75em;
+  margin-left: auto;
+  font-family: "Inter";
+  font-weight: bold;
+  display: none;
 }
 
 /* Overlay sombre */
@@ -289,7 +370,7 @@ header {
   display: none;
 }
 
-/* Contenu */
+/* Contenu & Animations */
 .content {
   flex: 1;
   padding: 30px;
@@ -308,22 +389,54 @@ header {
   border-bottom: 1px solid var(--border);
   padding-bottom: 10px;
 }
+
 .tab-content {
   display: none;
 }
 .tab-content.active {
   display: block;
-  animation: fadeIn 0.4s ease;
+  animation: slideFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
-@keyframes fadeIn {
+@keyframes slideFadeIn {
   from {
     opacity: 0;
-    transform: translateY(5px);
+    transform: translateY(15px);
   }
   to {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* Skeletons Loaders */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--bg-input) 25%,
+    var(--border) 50%,
+    var(--bg-input) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeletonLoading 1.5s infinite;
+  border-radius: 4px;
+}
+@keyframes skeletonLoading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+.skeleton-row {
+  height: 20px;
+  margin-bottom: 10px;
+  border-radius: 4px;
+}
+.skeleton-card {
+  height: 120px;
+  border-radius: 8px;
+  margin-bottom: 15px;
 }
 
 /* Cartes */
@@ -334,6 +447,7 @@ header {
   border: 1px solid var(--border);
   margin-bottom: 24px;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+  transition: 0.3s;
 }
 .card h3 {
   font-size: 1.1em;
@@ -718,15 +832,12 @@ header {
   border-color: var(--danger);
 }
 
-/* =========================================
-   REFONTE DESIGN : CARTES DE STOCK
-   ========================================= */
+/* Stock */
 .stock-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 20px;
 }
-
 .stock-item {
   background: var(--bg-card);
   padding: 20px;
@@ -738,7 +849,6 @@ header {
   align-items: center;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
 }
-
 .stock-item h4 {
   font-size: 0.9em;
   margin-bottom: 15px;
@@ -748,7 +858,6 @@ header {
   width: 100%;
   box-sizing: border-box;
 }
-
 .stock-item .qty {
   font-size: 2.5em;
   font-family: "Cinzel";
@@ -757,7 +866,6 @@ header {
   margin-bottom: 5px;
   text-shadow: 0 2px 10px rgba(46, 125, 50, 0.3);
 }
-
 .stock-controls {
   display: flex;
   flex-direction: column;
@@ -812,7 +920,6 @@ header {
   color: #fff;
 }
 
-/* Badge pour le stock projeté */
 .badge-projete {
   display: inline-block;
   padding: 4px 12px;
@@ -822,7 +929,6 @@ header {
   margin-bottom: 10px;
   border: 1px solid;
 }
-
 .badge-projete.positive {
   background: rgba(46, 125, 50, 0.15);
   color: #4ade80;
@@ -1054,7 +1160,7 @@ header {
 }
 
 /* =========================================
-   RESPONSIVE (MOBILE & TABLETTE)
+   RESPONSIVE
    ========================================= */
 @media (max-width: 1024px) {
   .grid-layout,
@@ -1077,7 +1183,6 @@ header {
   .user-info span:first-child {
     display: none;
   }
-
   .sidebar {
     position: fixed;
     top: 70px;
@@ -1098,7 +1203,6 @@ header {
     opacity: 1;
     pointer-events: auto;
   }
-
   .content {
     padding: 15px;
   }
@@ -1111,13 +1215,11 @@ header {
   .card {
     padding: 15px;
   }
-
   .data-table th,
   .data-table td {
     padding: 8px 10px;
     font-size: 0.85em;
   }
-
   .order-item-row {
     flex-wrap: wrap;
   }
