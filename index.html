@@ -142,6 +142,16 @@
                 >0</span
               >
             </button>
+
+            <!-- NOUVEAU BOUTON HISTORIQUE -->
+            <button
+              class="nav-btn"
+              id="nav-historique-cdes"
+              onclick="switchTab('tab-historique-cdes', this)"
+            >
+              <i class="fa-solid fa-clock-rotate-left"></i> Histo. Commandes
+            </button>
+
             <button class="nav-btn" onclick="switchTab('tab-stock', this)">
               <i class="fa-solid fa-boxes-stacked"></i> Stock
             </button>
@@ -167,7 +177,7 @@
               id="nav-historique"
               onclick="switchTab('tab-historique', this)"
             >
-              <i class="fa-solid fa-book"></i> Historique
+              <i class="fa-solid fa-book"></i> Mon Historique
             </button>
             <button
               class="nav-btn"
@@ -286,6 +296,30 @@
                     class="orders-grid"
                     style="grid-template-columns: 1fr"
                   ></div>
+                </div>
+              </div>
+            </section>
+
+            <!-- NOUVEL ONGLET HISTORIQUE DES COMMANDES -->
+            <section id="tab-historique-cdes" class="tab-content">
+              <h2 class="page-title">Historique des Commandes</h2>
+              <div class="card">
+                <div class="table-responsive">
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Client</th>
+                        <th>Articles</th>
+                        <th>Total</th>
+                        <th>Statut</th>
+                        <th>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody id="orders-history-body">
+                      <!-- Rempli par le JS -->
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </section>

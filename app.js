@@ -215,16 +215,14 @@ async function createOrder(e) {
   if (items.length === 0)
     return showPopup("Erreur", "Veuillez ajouter au moins un article.");
 
-  const { error } = await db
-    .from("orders")
-    .insert({
-      client_name,
-      items,
-      delivery_time,
-      deadline,
-      note,
-      created_by: currentUser.id,
-    });
+  const { error } = await db.from("orders").insert({
+    client_name,
+    items,
+    delivery_time,
+    deadline,
+    note,
+    created_by: currentUser.id,
+  });
   if (error) showPopup("Erreur", error.message);
   else {
     showToast("Commande créée !", "success");
@@ -240,6 +238,7 @@ async function loadOrders() {
   const { data: orders } = await db
     .from("orders")
     .select("*")
+    .eq("status", "pending")
     .order("created_at", { ascending: true });
   const container = document.getElementById("orders-container");
   if (!container) return;
@@ -249,18 +248,8 @@ async function loadOrders() {
   if (orders && orders.length > 0) {
     container.innerHTML = "";
     orders.forEach((o) => {
-      let orderItems = o.items;
-      if (!orderItems || orderItems.length === 0) {
-        if (o.item_type)
-          orderItems = [
-            {
-              item_type: o.item_type,
-              quantity: o.quantity,
-              unit_price: o.unit_price,
-            },
-          ];
-        else orderItems = [];
-      }
+      // Plus besoin de fallback, on utilise directement o.items
+      let orderItems = o.items || [];
       let itemsHtml = "";
       let totalGeneral = 0;
       let maxDate = o.deadline
@@ -296,7 +285,7 @@ async function loadOrders() {
                 </div>`;
     });
   } else {
-    container.innerHTML = `<div class="empty-state"><i class="fa-solid fa-clipboard-list"></i><p>Aucune commande.</p></div>`;
+    container.innerHTML = `<div class="empty-state"><i class="fa-solid fa-clipboard-list"></i><p>Aucune commande en attente.</p></div>`;
   }
 }
 
@@ -328,10 +317,12 @@ async function honorOrder(id, client_name, itemsJson) {
         .from("transactions")
         .insert(transactionsToInsert);
       if (tErr) return showPopup("Erreur", tErr.message);
-      await db.from("orders").delete().eq("id", id);
+
+      await db.from("orders").update({ status: "honored" }).eq("id", id);
+
       showToast("Commande honorée !", "success");
       loadOrders();
-      loadStock();
+      loadOrderHistory();
       loadOrderRequirements();
       loadEmployeData();
       if (userProfile.role === "patron") {
@@ -344,11 +335,72 @@ async function honorOrder(id, client_name, itemsJson) {
 
 async function cancelOrder(id) {
   showConfirm("Annuler", "Annuler cette commande ?", async () => {
-    await db.from("orders").delete().eq("id", id);
+    await db.from("orders").update({ status: "cancelled" }).eq("id", id);
     showToast("Commande annulée", "info");
     loadOrders();
+    loadOrderHistory();
     loadOrderRequirements();
   });
+}
+
+async function loadOrderHistory() {
+  const { data: orders } = await db
+    .from("orders")
+    .select("*")
+    .neq("status", "pending")
+    .order("created_at", { ascending: false });
+
+  const tbody = document.getElementById("orders-history-body");
+  if (!tbody) return;
+
+  if (orders && orders.length > 0) {
+    tbody.innerHTML = "";
+    orders.forEach((o) => {
+      let total = 0;
+      let itemsText = "";
+      const items = o.items || [];
+
+      itemsText = items.map((i) => `${i.quantity}x ${i.item_type}`).join(", ");
+      items.forEach((i) => (total += i.quantity * i.unit_price));
+
+      const isHonored = o.status === "honored";
+      const badge = isHonored
+        ? `<span class="badge-type bg-green" style="color:white; background-color:var(--success);">Honorée</span>`
+        : `<span class="badge-type bg-red" style="color:white; background-color:var(--danger);">Annulée</span>`;
+
+      const actionBtn =
+        userProfile.role === "patron"
+          ? `<button class="btn-secondary" style="padding: 4px 8px; font-size: 0.8em;" onclick="restoreOrder(${o.id})"><i class="fa-solid fa-rotate-left"></i> Rétablir</button>`
+          : "-";
+
+      tbody.innerHTML += `
+        <tr>
+          <td>${new Date(o.created_at).toLocaleDateString()}</td>
+          <td><strong>${o.client_name}</strong></td>
+          <td style="font-size: 0.85em; max-width: 250px;">${itemsText}</td>
+          <td style="color: var(--success); font-weight: bold;">${Math.round(total)} S</td>
+          <td>${badge}</td>
+          <td>${actionBtn}</td>
+        </tr>
+      `;
+    });
+  } else {
+    tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><p>Aucune commande passée.</p></div></td></tr>`;
+  }
+}
+
+async function restoreOrder(id) {
+  showConfirm(
+    "Rétablir",
+    "Remettre cette commande dans la file d'attente ?",
+    async () => {
+      await db.from("orders").update({ status: "pending" }).eq("id", id);
+      showToast("Commande rétablie !", "success");
+      loadOrders();
+      loadOrderHistory();
+      loadOrderRequirements();
+    },
+  );
 }
 
 // ==========================================
@@ -364,19 +416,12 @@ function openEditOrderModal(id) {
   document.getElementById("edit-ord-note").value = order.note || "";
   const container = document.getElementById("edit-order-items-container");
   container.innerHTML = "";
-  let orderItems =
-    order.items ||
-    (order.item_type
-      ? [
-          {
-            item_type: order.item_type,
-            quantity: order.quantity,
-            unit_price: order.unit_price,
-          },
-        ]
-      : []);
+
+  // Simplifié : on utilise directement order.items
+  let orderItems = order.items || [];
   if (orderItems.length > 0) orderItems.forEach((item) => addEditItemRow(item));
   else addEditItemRow();
+
   document.getElementById("edit-order-modal").style.display = "flex";
 }
 
@@ -454,7 +499,10 @@ async function saveEditedOrder() {
 // --- BESOINS & PROJECTION DES COMMANDES ---
 // ==========================================
 async function loadOrderRequirements() {
-  const { data: orders } = await db.from("orders").select("items");
+  const { data: orders } = await db
+    .from("orders")
+    .select("items")
+    .eq("status", "pending");
   const { data: stocks } = await db
     .from("stocks")
     .select("item_name, quantity");
@@ -652,6 +700,7 @@ async function checkUserStatus() {
   loadStock();
   loadTreasury();
   loadOrders();
+  loadOrderHistory();
   loadOrderRequirements();
   updateBasePrice();
   setupRealtime();
@@ -720,6 +769,7 @@ function setupRealtime() {
       () => {
         if (!isTyping()) {
           loadOrders();
+          loadOrderHistory();
           loadOrderRequirements();
         }
         showToast("Nouvelle commande reçue !", "info");
@@ -731,6 +781,7 @@ function setupRealtime() {
       () => {
         if (!isTyping()) {
           loadOrders();
+          loadOrderHistory();
           loadOrderRequirements();
         }
       },
@@ -741,6 +792,7 @@ function setupRealtime() {
       () => {
         if (!isTyping()) {
           loadOrders();
+          loadOrderHistory();
           loadOrderRequirements();
         }
       },
@@ -795,16 +847,14 @@ async function updateTreasuryDirect(input) {
     "Modification directe",
     `Ajuster de ${diff > 0 ? "+" : ""}${diff} S ?`,
     async () => {
-      const { error } = await db
-        .from("transactions")
-        .insert({
-          type: "ajustement",
-          item_type: "Ajustement",
-          counterparty_name: "Modification directe",
-          quantity: 1,
-          unit_price: diff,
-          created_by: currentUser.id,
-        });
+      const { error } = await db.from("transactions").insert({
+        type: "ajustement",
+        item_type: "Ajustement",
+        counterparty_name: "Modification directe",
+        quantity: 1,
+        unit_price: diff,
+        created_by: currentUser.id,
+      });
       if (error) {
         showPopup("Erreur", error.message);
         loadTreasury();
@@ -825,16 +875,14 @@ async function adjustTreasury(type) {
     `Ajustement`,
     `Voulez-vous ${action.toLowerCase()} ${amount} S ?`,
     async () => {
-      const { error } = await db
-        .from("transactions")
-        .insert({
-          type: "ajustement",
-          item_type: "Ajustement",
-          counterparty_name: `Manuel (${action})`,
-          quantity: 1,
-          unit_price: type === 1 ? amount : -amount,
-          created_by: currentUser.id,
-        });
+      const { error } = await db.from("transactions").insert({
+        type: "ajustement",
+        item_type: "Ajustement",
+        counterparty_name: `Manuel (${action})`,
+        quantity: 1,
+        unit_price: type === 1 ? amount : -amount,
+        created_by: currentUser.id,
+      });
       if (error) showPopup("Erreur", error.message);
       else {
         await addLog("Trésorerie", `${action} manuel de ${amount} S.`);
@@ -853,7 +901,10 @@ async function loadStock() {
     .select("*")
     .order("id");
 
-  const { data: orders } = await db.from("orders").select("items");
+  const { data: orders } = await db
+    .from("orders")
+    .select("items")
+    .eq("status", "pending");
   let requirements = {};
   if (orders) {
     orders.forEach((o) => {
@@ -974,16 +1025,14 @@ async function addTransaction(e) {
     if (stock && stock.quantity < quantity)
       return showToast(`Stock insuffisant pour ${item_type}`, "danger");
   }
-  const { error } = await db
-    .from("transactions")
-    .insert({
-      type,
-      item_type,
-      counterparty_name: userProfile.full_name,
-      quantity,
-      unit_price,
-      created_by: currentUser.id,
-    });
+  const { error } = await db.from("transactions").insert({
+    type,
+    item_type,
+    counterparty_name: userProfile.full_name,
+    quantity,
+    unit_price,
+    created_by: currentUser.id,
+  });
   if (error) showPopup("Erreur", error.message);
   else {
     showToast("Opération enregistrée !", "success");
@@ -998,6 +1047,9 @@ async function addTransaction(e) {
   }
 }
 
+// ==========================================
+// --- OPTIMISATION DU DASHBOARD PATRON ---
+// ==========================================
 async function loadPatronData() {
   const { data: personnel, error } = await db
     .from("profiles")
@@ -1008,6 +1060,7 @@ async function loadPatronData() {
   if (!personnelDiv || !salDiv) return;
   personnelDiv.innerHTML = "";
   salDiv.innerHTML = "";
+
   if (error) {
     personnelDiv.innerHTML = `<p class="text-danger">Erreur.</p>`;
   } else if (!personnel || personnel.length === 0) {
@@ -1054,16 +1107,16 @@ async function loadPatronData() {
   }
   updateSalaryTotal();
 
-  const { data: allT } = await db
-    .from("transactions")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(transactionLimit);
+  // OPTIMISATION ICI : Une seule requête au lieu de deux
   const { data: globalT } = await db
     .from("transactions")
     .select(
-      "quantity, unit_price, type, created_at, item_type, counterparty_name",
-    );
+      "id, quantity, unit_price, type, created_at, item_type, counterparty_name",
+    )
+    .order("created_at", { ascending: false });
+
+  // On utilise .slice() pour ne garder que ce qui doit être affiché dans le tableau
+  const allT = globalT ? globalT.slice(0, transactionLimit) : [];
 
   const filtered = getFilteredTransactions(globalT);
   const displayFiltered = getFilteredTransactions(allT);
@@ -1097,7 +1150,7 @@ async function loadPatronData() {
     });
 
     const btnLoadMore = document.getElementById("btn-load-more");
-    if (globalT.length > transactionLimit)
+    if (globalT && globalT.length > transactionLimit)
       btnLoadMore.style.display = "inline-block";
     else btnLoadMore.style.display = "none";
   } else {
@@ -1441,13 +1494,11 @@ async function confirmAllocateBarrel() {
   const p = parseFloat(document.getElementById("allocate-price").value) || 50;
   if (!cN) return showPopup("Erreur", "Nom invalide.");
   if (!currentBarrelToAllocate) return;
-  await db
-    .from("barrel_rentals")
-    .insert({
-      barrel_number: currentBarrelToAllocate,
-      client_name: cN,
-      price: p,
-    });
+  await db.from("barrel_rentals").insert({
+    barrel_number: currentBarrelToAllocate,
+    client_name: cN,
+    price: p,
+  });
   showToast("Tonneau alloué.", "success");
   closeAllocateModal();
   loadBarrels();
@@ -1481,16 +1532,14 @@ async function payBarrel(id, num, cN) {
       .from("barrel_rentals")
       .update({ last_payment_date: new Date().toISOString() })
       .eq("id", id);
-    await db
-      .from("transactions")
-      .insert({
-        type: "vente",
-        item_type: "Location tonneau",
-        counterparty_name: cN,
-        quantity: 1,
-        unit_price: fp,
-        created_by: currentUser.id,
-      });
+    await db.from("transactions").insert({
+      type: "vente",
+      item_type: "Location tonneau",
+      counterparty_name: cN,
+      quantity: 1,
+      unit_price: fp,
+      created_by: currentUser.id,
+    });
     showToast(`${fp} S encaissés.`, "success");
     loadBarrels();
     if (userProfile.role === "patron") {
@@ -1575,16 +1624,14 @@ async function payFurnace(id, cN) {
       .from("furnace_rentals")
       .update({ last_payment_date: new Date().toISOString() })
       .eq("id", id);
-    await db
-      .from("transactions")
-      .insert({
-        type: "vente",
-        item_type: "Location four",
-        counterparty_name: cN,
-        quantity: 1,
-        unit_price: 30,
-        created_by: currentUser.id,
-      });
+    await db.from("transactions").insert({
+      type: "vente",
+      item_type: "Location four",
+      counterparty_name: cN,
+      quantity: 1,
+      unit_price: 30,
+      created_by: currentUser.id,
+    });
     showToast("30 S encaissés.", "success");
     loadFurnaces();
     if (userProfile.role === "patron") {
