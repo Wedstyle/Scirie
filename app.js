@@ -8,7 +8,7 @@ let currentUser = null;
 let userProfile = null;
 let chartAchatsInstance = null;
 let chartVentesInstance = null;
-let chartTendanceInstance = null; // NOUVEAU
+let chartTendanceInstance = null;
 let currentPeriod = "all";
 let currentBarrelToAllocate = null;
 let realtimeChannel = null;
@@ -116,6 +116,12 @@ function switchTab(tabId, btnElement) {
   document.getElementById(tabId).classList.add("active");
   if (btnElement) btnElement.classList.add("active");
   if (window.innerWidth <= 768) closeSidebar();
+
+  if (tabId === "tab-gestion") {
+    setTimeout(() => {
+      loadPatronData();
+    }, 100);
+  }
 }
 
 function toggleSidebar() {
@@ -276,6 +282,7 @@ async function loadOrders() {
         totalGeneral += cost;
         itemsHtml += `<div style="display: flex; justify-content: space-between; border-bottom: 1px dashed var(--border); padding: 5px 0; font-size: 0.9em;"><span><strong style="color: ${typeColors[item.item_type] || "#888"};">${item.quantity}x</strong> ${item.item_type}</span><span style="color: var(--text-muted);">(${parseFloat(item.unit_price).toFixed(2)} S/u)</span></div>`;
       });
+
       container.innerHTML += `
         <div class="order-card" style="border-left-color: var(--primary); padding: 15px; margin-bottom: 15px;">
           <div style="margin-bottom: 10px; display: flex; justify-content: space-between; align-items: flex-start;">
@@ -288,7 +295,7 @@ async function loadOrders() {
           </div>
           ${noteHtml}
           <div class="actions" style="display: flex; gap: 10px; margin-top: 15px;">
-            <button class="btn-honor" style="flex: 1;" onclick='honorOrder("${o.id}", "${o.client_name}", ${JSON.stringify(orderItems).replace(/'/g, "&#39;")})'><i class="fa-solid fa-check"></i> Honorer</button>
+            <button class="btn-honor" style="flex: 1;" onclick="honorOrder(${o.id})"><i class="fa-solid fa-check"></i> Honorer</button>
             <button style="flex: 1; border: 1px solid var(--warning); color: var(--warning); background: transparent; border-radius: 4px; font-weight: 700; font-family: 'Cinzel'; cursor: pointer;" onclick="openEditOrderModal(${o.id})"><i class="fa-solid fa-pen"></i> Modifier</button>
             <button class="btn-cancel" style="flex: 1;" onclick="cancelOrder(${o.id})"><i class="fa-solid fa-xmark"></i> Annuler</button>
           </div>
@@ -299,9 +306,12 @@ async function loadOrders() {
   }
 }
 
-async function honorOrder(id, client_name, itemsJson) {
-  const items =
-    typeof itemsJson === "string" ? JSON.parse(itemsJson) : itemsJson;
+async function honorOrder(id) {
+  const order = currentOrders.find((o) => o.id === id);
+  if (!order) return;
+  const client_name = order.client_name;
+  const items = order.items || [];
+
   for (const item of items) {
     const { data: stock } = await db
       .from("stocks")
@@ -311,6 +321,7 @@ async function honorOrder(id, client_name, itemsJson) {
     if (stock && stock.quantity < item.quantity)
       return showToast(`Stock insuffisant : ${item.item_type}`, "danger");
   }
+
   showConfirm("Honorer", `Déduire le stock pour ${client_name} ?`, async () => {
     const transactionsToInsert = items.map((item) => ({
       type: "vente",
@@ -595,7 +606,6 @@ async function checkUserStatus() {
   }
   userProfile = profile;
 
-  // BLOQUER LES UTILISATEURS VIRÉS
   if (profile.is_fired) {
     document.getElementById("auth-screen").style.display = "none";
     document.getElementById("app-screen").style.display = "none";
@@ -951,7 +961,6 @@ async function addTransaction(e) {
 // --- PATRON DATA (DASHBOARD) ---
 // ==========================================
 async function loadPatronData() {
-  // 1. Récupérer le personnel (filtré)
   const { data: allPersonnel, error } = await db
     .from("profiles")
     .select("*")
@@ -1013,17 +1022,14 @@ async function loadPatronData() {
   }
   updateSalaryTotal();
 
-  // Mise à jour KPI Employés
   const kpiEmployes = document.getElementById("kpi-employes");
   if (kpiEmployes && personnel)
     kpiEmployes.innerText = personnel.filter((p) => p.is_approved).length;
 
-  // Mise à jour KPI Tonneaux Occupés
   const { data: rentals } = await db.from("barrel_rentals").select("id");
   const kpiBarrels = document.getElementById("kpi-barrels");
   if (kpiBarrels && rentals) kpiBarrels.innerText = `${rentals.length} / 23`;
 
-  // 2. Récupérer les transactions
   const { data: globalT } = await db
     .from("transactions")
     .select(
@@ -1034,7 +1040,6 @@ async function loadPatronData() {
   const filtered = getFilteredTransactions(globalT);
   const displayFiltered = getFilteredTransactions(allT);
 
-  // 3. Calculer les KPIs du MOIS
   let caMois = 0,
     depMois = 0;
   const now = new Date();
@@ -1060,7 +1065,6 @@ async function loadPatronData() {
     kpiProfit.style.color = profit >= 0 ? "var(--success)" : "var(--danger)";
   }
 
-  // 4. Remplir le tableau
   const tbody = document.getElementById("admin-history-body");
   if (displayFiltered && displayFiltered.length > 0) {
     tbody.innerHTML = "";
@@ -1097,7 +1101,6 @@ async function loadPatronData() {
     document.getElementById("btn-load-more").style.display = "none";
   }
 
-  // Anciens Stats (suivant le filtre de période)
   let tA = 0,
     tV = 0,
     tS = 0;
@@ -1115,7 +1118,6 @@ async function loadPatronData() {
   eB.innerText = Math.round(b) + " S";
   eB.className = b >= 0 ? "text-success" : "text-danger";
 
-  // Recherche & Tri
   const searchInput = document.getElementById("search-tx");
   const sortInput = document.getElementById("sort-tx");
   if (searchInput && sortInput) {
@@ -1167,14 +1169,19 @@ async function loadPatronData() {
     }
   }
 
-  renderCharts(filtered, globalT); // On passe globalT pour la courbe
+  renderCharts(filtered, globalT);
 }
 
 // ==========================================
 // --- GRAPHIQUES (CAMEMBERT + COURBE) ---
 // ==========================================
 function renderCharts(transactions, allTransactions) {
-  // --- 1. CAMEMBERT (Achats/Ventes) ---
+  const canvasAchats = document.getElementById("chart-achats");
+  const canvasVentes = document.getElementById("chart-ventes");
+  const canvasTendance = document.getElementById("chart-tendance");
+
+  if (!canvasAchats || !canvasVentes || !canvasTendance) return;
+
   let achats = {};
   let ventes = {};
   transactions.forEach((t) => {
@@ -1227,7 +1234,7 @@ function renderCharts(transactions, allTransactions) {
     return `hsl(${hash % 360}, 60%, 50%)`;
   };
 
-  const ctxA = document.getElementById("chart-achats").getContext("2d");
+  const ctxA = canvasAchats.getContext("2d");
   if (labelsAchats.length === 0) {
     chartAchatsInstance = new Chart(ctxA, {
       type: "doughnut",
@@ -1262,7 +1269,7 @@ function renderCharts(transactions, allTransactions) {
     });
   }
 
-  const ctxV = document.getElementById("chart-ventes").getContext("2d");
+  const ctxV = canvasVentes.getContext("2d");
   if (labelsVentes.length === 0) {
     chartVentesInstance = new Chart(ctxV, {
       type: "doughnut",
@@ -1297,10 +1304,8 @@ function renderCharts(transactions, allTransactions) {
     });
   }
 
-  // --- 2. COURBE DE TENDANCE (30 JOURS) ---
   if (chartTendanceInstance) chartTendanceInstance.destroy();
 
-  // Préparer les 30 derniers jours
   const last30Days = [];
   for (let i = 29; i >= 0; i--) {
     const d = new Date();
@@ -1324,9 +1329,8 @@ function renderCharts(transactions, allTransactions) {
     });
   }
 
-  const ctxT = document.getElementById("chart-tendance").getContext("2d");
+  const ctxT = canvasTendance.getContext("2d");
 
-  // Gradient pour faire joli
   let gradientBleu = ctxT.createLinearGradient(0, 0, 0, 400);
   gradientBleu.addColorStop(0, "rgba(46, 125, 50, 0.5)");
   gradientBleu.addColorStop(1, "rgba(46, 125, 50, 0.0)");
@@ -1514,6 +1518,9 @@ async function paySalaries() {
   );
 }
 
+// ==========================================
+// --- TONNEAUX ---
+// ==========================================
 async function loadBarrels() {
   const { data: rentals } = await db.from("barrel_rentals").select("*");
   const container = document.querySelector("#tab-location .barrels-grid");
@@ -1668,6 +1675,9 @@ async function freeBarrel(id) {
   });
 }
 
+// ==========================================
+// --- FOURS (MIS A JOUR POUR PRESTATION VS HEBDO) ---
+// ==========================================
 async function loadFurnaces() {
   const { data: furnaces } = await db
     .from("furnace_rentals")
@@ -1675,42 +1685,68 @@ async function loadFurnaces() {
     .order("created_at", { ascending: true });
   const container = document.getElementById("furnaces-container");
   if (!container) return;
+
   if (furnaces && furnaces.length > 0) {
     container.innerHTML = "";
     let lateCount = 0;
+
     furnaces.forEach((f) => {
       let cC = "free",
         sT = "Libre",
         pI = "",
         aH = "";
-      if (f.last_payment_date) {
-        const lP = new Date(f.last_payment_date),
-          nP = new Date(lP);
-        nP.setDate(nP.getDate() + 7);
-        const dD = Math.ceil(
-          (nP.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24),
-        );
-        const o = { day: "2-digit", month: "2-digit", year: "numeric" };
-        if (dD < 0) {
-          cC = "late";
-          sT = "En retard";
-          lateCount++;
-          pI = `<span>Dernier : ${lP.toLocaleDateString("fr-FR", o)}</span><span class="next-pay-date">Dû le : ${nP.toLocaleDateString("fr-FR", o)}</span><span style="color: var(--danger); font-weight: bold;">Retard de ${Math.abs(dD)}j</span>`;
-        } else {
-          cC = "paid";
-          sT = "À jour";
-          pI = `<span>Dernier : ${lP.toLocaleDateString("fr-FR", o)}</span><span class="next-pay-date">Prochain : <strong>${nP.toLocaleDateString("fr-FR", o)}</strong></span><span>Dans ${dD}j</span>`;
-        }
+      const fPrice = f.price || 30;
+
+      if (f.rental_type === "usage") {
+        // LOGIQUE PRESTATION
+        cC = "paid";
+        sT = "À la prestation";
+        pI = `<span>Tarif : <strong>${fPrice} S</strong></span><span style="color: var(--text-muted); font-size: 0.85em;">Paiement à l'utilisation</span>`;
+        aH = `<button class="btn-pay" onclick="payFurnace(${f.id}, '${f.client_name.replace(/'/g, "\\'")}', ${fPrice}, 'usage')"><i class="fa-solid fa-coins"></i> Encaisser ${fPrice}</button>`;
       } else {
-        cC = "late";
-        sT = "Jamais payé";
-        lateCount++;
-        pI = `<span style="color: var(--danger);">Aucun paiement</span>`;
+        // LOGIQUE HEBDO
+        if (f.last_payment_date) {
+          const lP = new Date(f.last_payment_date),
+            nP = new Date(lP);
+          nP.setDate(nP.getDate() + 7);
+          const dD = Math.ceil(
+            (nP.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24),
+          );
+          const o = { day: "2-digit", month: "2-digit", year: "numeric" };
+          if (dD < 0) {
+            cC = "late";
+            sT = "En retard";
+            lateCount++;
+            pI = `<span>Dernier : ${lP.toLocaleDateString("fr-FR", o)}</span><span class="next-pay-date">Dû le : ${nP.toLocaleDateString("fr-FR", o)}</span><span style="color: var(--danger); font-weight: bold;">Retard de ${Math.abs(dD)}j</span>`;
+          } else {
+            cC = "paid";
+            sT = "À jour";
+            pI = `<span>Dernier : ${lP.toLocaleDateString("fr-FR", o)}</span><span class="next-pay-date">Prochain : <strong>${nP.toLocaleDateString("fr-FR", o)}</strong></span><span>Dans ${dD}j</span>`;
+          }
+        } else {
+          cC = "late";
+          sT = "Jamais payé";
+          lateCount++;
+          pI = `<span style="color: var(--danger);">Aucun paiement</span>`;
+        }
+        aH = `<button class="btn-pay" onclick="payFurnace(${f.id}, '${f.client_name.replace(/'/g, "\\'")}', ${fPrice}, 'weekly')"><i class="fa-solid fa-coins"></i> Encaisser ${fPrice}</button>`;
       }
-      aH = `<button class="btn-pay" onclick="payFurnace(${f.id}, '${f.client_name}')"><i class="fa-solid fa-coins"></i> Encaisser 30</button>`;
+
       if (userProfile.role === "patron")
         aH += `<button class="btn-free" onclick="freeFurnace(${f.id})"><i class="fa-solid fa-trash"></i> Libérer</button>`;
-      container.innerHTML += `<div class="barrel-card ${cC}"><div class="barrel-header"><h3>Four</h3><span class="status-badge">${sT}</span></div><div class="barrel-body"><div class="client-name"><i class="fa-solid fa-user"></i> ${f.client_name}</div><div class="pay-info">${pI}</div></div><div class="barrel-actions">${aH}</div></div>`;
+
+      container.innerHTML += `
+        <div class="barrel-card ${cC}">
+          <div class="barrel-header">
+            <h3>Four</h3>
+            <span class="status-badge">${sT}</span>
+          </div>
+          <div class="barrel-body">
+            <div class="client-name"><i class="fa-solid fa-user"></i> ${f.client_name}</div>
+            <div class="pay-info">${pI}</div>
+          </div>
+          <div class="barrel-actions">${aH}</div>
+        </div>`;
     });
     updateNavBadge("nav-four-badge", lateCount);
   } else {
@@ -1718,40 +1754,60 @@ async function loadFurnaces() {
     updateNavBadge("nav-four-badge", 0);
   }
 }
+
 function openFurnaceModal() {
   document.getElementById("furnace-client-name").value = "";
+  document.getElementById("furnace-type").value = "weekly";
+  document.getElementById("furnace-price").value = 30;
   document.getElementById("create-furnace-modal").style.display = "flex";
 }
+
 function closeFurnaceModal() {
   document.getElementById("create-furnace-modal").style.display = "none";
 }
+
 async function confirmCreateFurnace() {
   const cN = document.getElementById("furnace-client-name").value.trim();
-  if (!cN) return showPopup("Erreur", "Nom.");
-  await db
-    .from("furnace_rentals")
-    .insert({ client_name: cN, created_by: currentUser.id });
+  const type = document.getElementById("furnace-type").value;
+  const price =
+    parseFloat(document.getElementById("furnace-price").value) || 30;
+
+  if (!cN) return showPopup("Erreur", "Nom requis.");
+
+  await db.from("furnace_rentals").insert({
+    client_name: cN,
+    created_by: currentUser.id,
+    rental_type: type,
+    price: price,
+    last_payment_date: type === "weekly" ? null : new Date().toISOString(),
+    // Si c'est de la prestation, on met la date à jour direct pour éviter les bugs d'affichage
+  });
+
   showToast("Client ajouté.", "success");
   closeFurnaceModal();
   loadFurnaces();
 }
-async function payFurnace(id, cN) {
-  showConfirm("Encaisser", `Encaisser 30 S ?`, async () => {
-    await db
-      .from("furnace_rentals")
-      .update({ last_payment_date: new Date().toISOString() })
-      .eq("id", id);
-    await db
-      .from("transactions")
-      .insert({
-        type: "vente",
-        item_type: "Location four",
-        counterparty_name: cN,
-        quantity: 1,
-        unit_price: 30,
-        created_by: currentUser.id,
-      });
-    showToast("30 S encaissés.", "success");
+
+async function payFurnace(id, cN, price, type) {
+  showConfirm("Encaisser", `Encaisser ${price} S pour ${cN} ?`, async () => {
+    // Si c'est hebdo, on met à jour la date. Si c'est prestation, on ne touche pas à la date.
+    if (type === "weekly") {
+      await db
+        .from("furnace_rentals")
+        .update({ last_payment_date: new Date().toISOString() })
+        .eq("id", id);
+    }
+
+    await db.from("transactions").insert({
+      type: "vente",
+      item_type: "Location four",
+      counterparty_name: cN,
+      quantity: 1,
+      unit_price: price,
+      created_by: currentUser.id,
+    });
+
+    showToast(`${price} S encaissés.`, "success");
     loadFurnaces();
     if (userProfile.role === "patron") {
       loadPatronData();
@@ -1760,8 +1816,9 @@ async function payFurnace(id, cN) {
     loadEmployeData();
   });
 }
+
 async function freeFurnace(id) {
-  showConfirm("Libérer", "Supprimer ?", async () => {
+  showConfirm("Libérer", "Supprimer ce client du four ?", async () => {
     await db.from("furnace_rentals").delete().eq("id", id);
     showToast("Client retiré.", "info");
     loadFurnaces();

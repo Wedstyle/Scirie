@@ -724,7 +724,7 @@
                     Location de Four
                   </h2>
                   <p style="color: var(--text-muted); font-size: 0.95em">
-                    Tarif : <strong>30 Septims / semaine</strong>.
+                    Gérez les locations à la semaine ou à la prestation.
                   </p>
                 </div>
                 <button
@@ -769,7 +769,7 @@
               </div>
             </section>
 
-            <!-- GESTION PATRON -->
+            <!-- GESTION PATRON (DASHBOARD NEXT-GEN) -->
             <section id="tab-gestion" class="tab-content">
               <div
                 style="
@@ -802,30 +802,81 @@
                   </select>
                 </div>
               </div>
-              <div class="stats-grid">
-                <div class="stat-card bg-green">
-                  <h3>Ventes (Période)</h3>
-                  <p id="stat-ventes">0 S</p>
+
+              <!-- NOUVEAUX KPI CARDS -->
+              <div class="kpi-grid">
+                <div class="kpi-card">
+                  <div class="kpi-icon text-success">
+                    <i class="fa-solid fa-sack-dollar"></i>
+                  </div>
+                  <div class="kpi-info">
+                    <h4>CA (Ce Mois)</h4>
+                    <p id="kpi-ca">0 S</p>
+                  </div>
                 </div>
-                <div class="stat-card bg-red">
-                  <h3>Dépenses (Période)</h3>
-                  <p id="stat-achats">0 S</p>
+                <div class="kpi-card">
+                  <div class="kpi-icon text-warning">
+                    <i class="fa-solid fa-chart-line"></i>
+                  </div>
+                  <div class="kpi-info">
+                    <h4>Bénéfice (Ce Mois)</h4>
+                    <p id="kpi-profit">0 S</p>
+                  </div>
                 </div>
-                <div class="stat-card bg-orange">
-                  <h3>Bénéfice (Période)</h3>
-                  <p id="stat-benefice">0 S</p>
+                <div class="kpi-card">
+                  <div class="kpi-icon text-primary">
+                    <i class="fa-solid fa-users"></i>
+                  </div>
+                  <div class="kpi-info">
+                    <h4>Employés Actifs</h4>
+                    <p id="kpi-employes">0</p>
+                  </div>
+                </div>
+                <div class="kpi-card">
+                  <div class="kpi-icon text-danger">
+                    <i class="fa-solid fa-wine-bottle"></i>
+                  </div>
+                  <div class="kpi-info">
+                    <h4>Tonneaux Occupés</h4>
+                    <p id="kpi-barrels">0 / 23</p>
+                  </div>
                 </div>
               </div>
+
+              <!-- GRAPHIQUE DE TENDANCE -->
+              <div class="card" style="height: 350px; margin-bottom: 24px">
+                <h3>
+                  <i class="fa-solid fa-arrow-trend-up"></i> Tendance (Ventes vs
+                  Achats sur 30 jours)
+                </h3>
+                <div style="position: relative; height: 260px; width: 100%">
+                  <canvas id="chart-tendance"></canvas>
+                </div>
+              </div>
+
+              <!-- ANCIENS GRAPHIQUES CAMEMBERT -->
               <div class="charts-grid">
-                <div class="card chart-card">
+                <div
+                  class="card chart-card"
+                  style="height: 300px; min-height: auto"
+                >
                   <h3>Répartition des Achats</h3>
-                  <canvas id="chart-achats"></canvas>
+                  <div style="position: relative; height: 200px; width: 100%">
+                    <canvas id="chart-achats"></canvas>
+                  </div>
                 </div>
-                <div class="card chart-card">
+                <div
+                  class="card chart-card"
+                  style="height: 300px; min-height: auto"
+                >
                   <h3>Répartition des Ventes</h3>
-                  <canvas id="chart-ventes"></canvas>
+                  <div style="position: relative; height: 200px; width: 100%">
+                    <canvas id="chart-ventes"></canvas>
+                  </div>
                 </div>
               </div>
+
+              <!-- TABLEAUX & PERSONNEL -->
               <div class="grid-layout">
                 <div class="col-left">
                   <div class="card">
@@ -837,10 +888,6 @@
                       id="admin-personnel-list"
                       style="max-height: 400px; overflow-y: auto"
                     >
-                      <div
-                        class="skeleton skeleton-row"
-                        style="height: 40px"
-                      ></div>
                       <div
                         class="skeleton skeleton-row"
                         style="height: 40px"
@@ -880,7 +927,6 @@
                 </div>
                 <div class="col-right">
                   <div class="card">
-                    <!-- RECHERCHE & TRI -->
                     <div
                       style="
                         display: flex;
@@ -899,7 +945,7 @@
                           type="text"
                           id="search-tx"
                           oninput="loadPatronData()"
-                          placeholder="Rechercher (nom, objet...)"
+                          placeholder="Rechercher..."
                           style="
                             padding: 8px 12px;
                             background: var(--bg-input);
@@ -908,6 +954,7 @@
                             border-radius: 4px;
                             font-family: &quot;Inter&quot;;
                             font-size: 0.9em;
+                            width: 150px;
                           "
                         />
                         <select
@@ -949,7 +996,6 @@
                             <td colspan="8">
                               <div class="skeleton skeleton-row"></div>
                               <div class="skeleton skeleton-row"></div>
-                              <div class="skeleton skeleton-row"></div>
                             </td>
                           </tr>
                         </tbody>
@@ -962,7 +1008,7 @@
                         onclick="loadMoreTransactions()"
                         style="display: none; width: auto; margin: 0 auto"
                       >
-                        Voir plus de transactions
+                        Voir plus
                       </button>
                     </div>
                   </div>
@@ -1008,6 +1054,7 @@
         <button class="btn-primary" onclick="closePopup()">Compris</button>
       </div>
     </div>
+
     <div id="allocate-barrel-modal" class="modal-overlay">
       <div class="modal-box">
         <h3>Allouer un Tonneau</h3>
@@ -1057,10 +1104,14 @@
         </div>
       </div>
     </div>
+
+    <!-- MODALE NOUVEAU CLIENT FOUR (MISE A JOUR PRESTATION VS HEBDO) -->
     <div id="create-furnace-modal" class="modal-overlay">
       <div class="modal-box">
         <h3>Nouveau Client (Four)</h3>
-        <div class="input-group" style="margin-bottom: 20px">
+
+        <div class="input-group" style="margin-bottom: 15px">
+          <label style="text-align: center">Nom du client</label>
           <input
             type="text"
             id="furnace-client-name"
@@ -1068,14 +1119,38 @@
             style="text-align: center; font-size: 1.1em; padding: 15px"
           />
         </div>
+
+        <div class="input-group" style="margin-bottom: 15px">
+          <label style="text-align: center">Type de location</label>
+          <select
+            id="furnace-type"
+            style="text-align: center; font-size: 1.1em; padding: 15px"
+          >
+            <option value="weekly">Hebdomadaire (Suivi de retard)</option>
+            <option value="usage">À la prestation (À la demande)</option>
+          </select>
+        </div>
+
+        <div class="input-group" style="margin-bottom: 20px">
+          <label style="text-align: center">Prix (S)</label>
+          <input
+            type="number"
+            id="furnace-price"
+            value="30"
+            min="0"
+            style="text-align: center; font-size: 1.1em; padding: 15px"
+          />
+        </div>
+
         <div style="display: flex; gap: 10px">
           <button
             class="btn-secondary"
             onclick="closeFurnaceModal()"
             style="flex: 1"
           >
-            Annuler</button
-          ><button
+            Annuler
+          </button>
+          <button
             class="btn-primary"
             onclick="confirmCreateFurnace()"
             style="flex: 1"
@@ -1085,6 +1160,7 @@
         </div>
       </div>
     </div>
+
     <div id="confirm-modal" class="modal-overlay">
       <div class="modal-box">
         <h3 id="confirm-title">Confirmation</h3>
