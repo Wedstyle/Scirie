@@ -42,9 +42,6 @@ const typeColors = {
   Divers: "#94A3B8",
 };
 
-// ==========================================
-// --- GESTION DES THÈMES ---
-// ==========================================
 function initTheme() {
   const savedTheme = localStorage.getItem("scierie_theme") || "autumn";
   document.body.className = `theme-${savedTheme}`;
@@ -57,9 +54,6 @@ function changeTheme(theme) {
 }
 document.addEventListener("DOMContentLoaded", initTheme);
 
-// ==========================================
-// --- UI HELPERS & TOASTS ---
-// ==========================================
 function showPopup(title, message) {
   document.getElementById("popup-title").innerText = title;
   document.getElementById("popup-message").innerText = message;
@@ -120,7 +114,7 @@ function switchTab(tabId, btnElement) {
   if (tabId === "tab-gestion") {
     setTimeout(() => {
       loadPatronData();
-    }, 100);
+    }, 150);
   }
 }
 
@@ -145,9 +139,6 @@ function updateNavBadge(id, count) {
   }
 }
 
-// ==========================================
-// --- GESTION DES LOGS (AUDIT) ---
-// ==========================================
 async function addLog(actionType, details) {
   if (!userProfile) return;
   await db
@@ -179,9 +170,6 @@ async function loadLogs() {
   }
 }
 
-// ==========================================
-// --- COMMANDES ---
-// ==========================================
 function loadMoreTransactions() {
   transactionLimit += 50;
   loadPatronData();
@@ -399,7 +387,6 @@ async function restoreOrder(id) {
   });
 }
 
-// --- MODIFIER COMMANDE ---
 function openEditOrderModal(id) {
   const order = currentOrders.find((o) => o.id === id);
   if (!order) return;
@@ -479,9 +466,6 @@ async function saveEditedOrder() {
   }
 }
 
-// ==========================================
-// --- BESOINS STOCK ---
-// ==========================================
 async function loadOrderRequirements() {
   const { data: orders } = await db
     .from("orders")
@@ -527,9 +511,6 @@ async function loadOrderRequirements() {
     tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state"><i class="fa-solid fa-check-double"></i><p>Aucun besoin.</p></div></td></tr>`;
 }
 
-// ==========================================
-// --- AUTH ---
-// ==========================================
 function changePeriod(val) {
   currentPeriod = val;
   loadPatronData();
@@ -690,9 +671,6 @@ async function checkUserStatus() {
   setupRealtime();
 }
 
-// ==========================================
-// --- TRESORERIE & STOCK ---
-// ==========================================
 async function loadTreasury() {
   if (!userProfile || userProfile.role !== "patron") return;
   const { data: transactions } = await db.from("transactions").select("*");
@@ -711,6 +689,7 @@ async function loadTreasury() {
   const el = document.getElementById("current-treasury");
   if (el) el.value = Math.floor(tV - tA - tS + tAj);
 }
+
 async function updateTreasuryDirect(input) {
   const newValue = parseInt(input.value);
   if (isNaN(newValue) || newValue < 0) return loadTreasury();
@@ -754,6 +733,7 @@ async function updateTreasuryDirect(input) {
     },
   );
 }
+
 async function adjustTreasury(type) {
   const amount = parseInt(document.getElementById("manual-amount").value);
   if (!amount || amount <= 0) return showPopup("Erreur", "Invalide.");
@@ -957,9 +937,6 @@ async function addTransaction(e) {
   }
 }
 
-// ==========================================
-// --- PATRON DATA (DASHBOARD) ---
-// ==========================================
 async function loadPatronData() {
   const { data: allPersonnel, error } = await db
     .from("profiles")
@@ -1036,26 +1013,27 @@ async function loadPatronData() {
       "id, quantity, unit_price, type, created_at, item_type, counterparty_name",
     )
     .order("created_at", { ascending: false });
-  const allT = globalT ? globalT.slice(0, transactionLimit) : [];
+
+  if (!globalT) return;
+
+  const allT = globalT.slice(0, transactionLimit);
   const filtered = getFilteredTransactions(globalT);
   const displayFiltered = getFilteredTransactions(allT);
 
   let caMois = 0,
     depMois = 0;
   const now = new Date();
-  if (globalT) {
-    globalT.forEach((t) => {
-      const d = new Date(t.created_at);
-      if (
-        d.getMonth() === now.getMonth() &&
-        d.getFullYear() === now.getFullYear()
-      ) {
-        const cost = t.quantity * t.unit_price;
-        if (t.type === "vente") caMois += cost;
-        if (t.type === "achat" || t.type === "salaire") depMois += cost;
-      }
-    });
-  }
+  globalT.forEach((t) => {
+    const d = new Date(t.created_at);
+    if (
+      d.getMonth() === now.getMonth() &&
+      d.getFullYear() === now.getFullYear()
+    ) {
+      const cost = t.quantity * t.unit_price;
+      if (t.type === "vente") caMois += cost;
+      if (t.type === "achat" || t.type === "salaire") depMois += cost;
+    }
+  });
   const kpiCa = document.getElementById("kpi-ca");
   const kpiProfit = document.getElementById("kpi-profit");
   if (kpiCa) kpiCa.innerText = Math.round(caMois) + " S";
@@ -1093,30 +1071,13 @@ async function loadPatronData() {
       tbody.innerHTML += `<tr><td>${new Date(t.created_at).toLocaleDateString()}</td><td>${t.counterparty_name}</td><td><span class="badge-type ${bC}" style="${t.type === "ajustement" ? "background-color: #3b82f6; color: white;" : ""}">${t.type.toUpperCase()}</span></td><td><span class="badge-type" style="background-color: ${color}; color: ${textColor};">${t.item_type}</span></td><td>${t.quantity}</td><td>${parseFloat(t.unit_price).toFixed(2)} S</td><td class="${tC}">${Math.round(cost)} S</td><td><button class="btn-icon text-danger" onclick="deleteTransaction(${t.id})"><i class="fa-solid fa-trash"></i></button></td></tr>`;
     });
     const btnLoadMore = document.getElementById("btn-load-more");
-    if (globalT && globalT.length > transactionLimit)
+    if (globalT.length > transactionLimit)
       btnLoadMore.style.display = "inline-block";
     else btnLoadMore.style.display = "none";
   } else {
     tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><p>Aucune transaction.</p></div></td></tr>`;
     document.getElementById("btn-load-more").style.display = "none";
   }
-
-  let tA = 0,
-    tV = 0,
-    tS = 0;
-  filtered.forEach((t) => {
-    const cost = t.quantity * t.unit_price;
-    if (t.type === "achat") tA += cost;
-    else if (t.type === "salaire") tS += cost;
-    else if (t.type === "vente") tV += cost;
-  });
-  const tD = tA + tS;
-  document.getElementById("stat-ventes").innerText = Math.round(tV) + " S";
-  document.getElementById("stat-achats").innerText = Math.round(tD) + " S";
-  const b = tV - tD;
-  const eB = document.getElementById("stat-benefice");
-  eB.innerText = Math.round(b) + " S";
-  eB.className = b >= 0 ? "text-success" : "text-danger";
 
   const searchInput = document.getElementById("search-tx");
   const sortInput = document.getElementById("sort-tx");
@@ -1172,9 +1133,6 @@ async function loadPatronData() {
   renderCharts(filtered, globalT);
 }
 
-// ==========================================
-// --- GRAPHIQUES (CAMEMBERT + COURBE) ---
-// ==========================================
 function renderCharts(transactions, allTransactions) {
   const canvasAchats = document.getElementById("chart-achats");
   const canvasVentes = document.getElementById("chart-ventes");
@@ -1350,23 +1308,23 @@ function renderCharts(transactions, allTransactions) {
         {
           label: "Ventes (S)",
           data: dailyVentes,
-          borderColor: "var(--success)",
+          borderColor: "#2e7d32",
           backgroundColor: gradientBleu,
           borderWidth: 2,
           tension: 0.4,
           fill: true,
-          pointBackgroundColor: "var(--success)",
+          pointBackgroundColor: "#2e7d32",
           pointRadius: 3,
         },
         {
           label: "Dépenses (S)",
           data: dailyAchats,
-          borderColor: "var(--danger)",
+          borderColor: "#c62828",
           backgroundColor: gradientRouge,
           borderWidth: 2,
           tension: 0.4,
           fill: true,
-          pointBackgroundColor: "var(--danger)",
+          pointBackgroundColor: "#c62828",
           pointRadius: 3,
         },
       ],
@@ -1393,9 +1351,6 @@ function renderCharts(transactions, allTransactions) {
   });
 }
 
-// ==========================================
-// --- UTILS PATRON & AUTRES ---
-// ==========================================
 async function showUserHistory(userId, userName) {
   document.getElementById("user-history-title").innerText =
     `Historique de ${userName}`;
@@ -1518,9 +1473,6 @@ async function paySalaries() {
   );
 }
 
-// ==========================================
-// --- TONNEAUX ---
-// ==========================================
 async function loadBarrels() {
   const { data: rentals } = await db.from("barrel_rentals").select("*");
   const container = document.querySelector("#tab-location .barrels-grid");
@@ -1675,9 +1627,6 @@ async function freeBarrel(id) {
   });
 }
 
-// ==========================================
-// --- FOURS (MIS A JOUR POUR PRESTATION VS HEBDO) ---
-// ==========================================
 async function loadFurnaces() {
   const { data: furnaces } = await db
     .from("furnace_rentals")
@@ -1698,13 +1647,11 @@ async function loadFurnaces() {
       const fPrice = f.price || 30;
 
       if (f.rental_type === "usage") {
-        // LOGIQUE PRESTATION
         cC = "paid";
         sT = "À la prestation";
         pI = `<span>Tarif : <strong>${fPrice} S</strong></span><span style="color: var(--text-muted); font-size: 0.85em;">Paiement à l'utilisation</span>`;
         aH = `<button class="btn-pay" onclick="payFurnace(${f.id}, '${f.client_name.replace(/'/g, "\\'")}', ${fPrice}, 'usage')"><i class="fa-solid fa-coins"></i> Encaisser ${fPrice}</button>`;
       } else {
-        // LOGIQUE HEBDO
         if (f.last_payment_date) {
           const lP = new Date(f.last_payment_date),
             nP = new Date(lP);
@@ -1780,7 +1727,6 @@ async function confirmCreateFurnace() {
     rental_type: type,
     price: price,
     last_payment_date: type === "weekly" ? null : new Date().toISOString(),
-    // Si c'est de la prestation, on met la date à jour direct pour éviter les bugs d'affichage
   });
 
   showToast("Client ajouté.", "success");
@@ -1790,7 +1736,6 @@ async function confirmCreateFurnace() {
 
 async function payFurnace(id, cN, price, type) {
   showConfirm("Encaisser", `Encaisser ${price} S pour ${cN} ?`, async () => {
-    // Si c'est hebdo, on met à jour la date. Si c'est prestation, on ne touche pas à la date.
     if (type === "weekly") {
       await db
         .from("furnace_rentals")
@@ -1855,9 +1800,6 @@ async function loadEmployeData() {
   }
 }
 
-// ==========================================
-// --- REALTIME ---
-// ==========================================
 function setupRealtime() {
   if (realtimeChannel) db.removeChannel(realtimeChannel);
   const isTyping = () => {

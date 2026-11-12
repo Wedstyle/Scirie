@@ -1,5 +1,4 @@
 :root {
-  /* Thème par défaut (Automne - style actuel amélioré) */
   --bg-main: #121212;
   --bg-card: #1e1e24;
   --bg-input: #0a0a0c;
@@ -15,44 +14,40 @@
   --radius: 4px;
 }
 
-/* =========================================
-   THÈMES SAISONNIERS
-   ========================================= */
 body.theme-winter {
   --bg-main: #0f172a;
   --bg-card: #1e293b;
   --bg-input: #0b1120;
   --text-main: #f8fafc;
   --text-muted: #94a3b8;
-  --primary: #38bdf8; /* Bleu glacé */
+  --primary: #38bdf8;
   --primary-hover: #7dd3fc;
   --border: #334155;
 }
 
 body.theme-spring {
-  --bg-main: #0f1712; /* Vert forêt très sombre */
+  --bg-main: #0f1712;
   --bg-card: #16261d;
   --bg-input: #0a120d;
   --text-main: #e8f5e9;
   --text-muted: #a5d6a7;
-  --primary: #81c784; /* Vert sauge doux */
+  --primary: #81c784;
   --primary-hover: #a5d6a7;
   --border: #2e4d38;
 }
 
 body.theme-summer {
-  --bg-main: #1a1410; /* Brun très sombre */
+  --bg-main: #1a1410;
   --bg-card: #2d2219;
   --bg-input: #120d0a;
   --text-main: #fff3e0;
-  --text-muted: #fcd34d; /* Jaune paille doux */
-  --primary: #ffb300; /* Ambre chaleureux */
+  --text-muted: #fcd34d;
+  --primary: #ffb300;
   --primary-hover: #ffca28;
   --border: #4a3423;
 }
 
 body.theme-autumn {
-  /* C'est le thème par défaut défini dans :root, on le garde pour le switch */
   --bg-main: #121212;
   --bg-card: #1e1e24;
   --bg-input: #0a0a0c;
@@ -95,7 +90,6 @@ h4,
   letter-spacing: 0.5px;
 }
 
-/* --- UI HELPERS --- */
 .full-screen {
   display: flex;
   justify-content: center;
@@ -192,7 +186,6 @@ h4,
   text-decoration: underline;
 }
 
-/* Boutons */
 .btn-primary {
   background: transparent;
   color: var(--primary);
@@ -236,7 +229,6 @@ h4,
   color: var(--danger);
 }
 
-/* Header */
 header {
   background: var(--bg-card);
   padding: 0 20px;
@@ -271,7 +263,6 @@ header {
   font-size: 0.75em;
 }
 
-/* Bouton Burger & Thème */
 .burger-menu {
   display: none;
   background: none;
@@ -292,7 +283,6 @@ header {
   outline: none;
 }
 
-/* Layout */
 .layout {
   display: flex;
   height: calc(100vh - 70px);
@@ -300,6 +290,7 @@ header {
 }
 .sidebar {
   width: 250px;
+  min-width: 250px;
   background: var(--bg-card);
   border-right: 1px solid var(--border);
   padding: 15px 0;
@@ -344,7 +335,6 @@ header {
   text-align: center;
 }
 
-/* Badges de navigation */
 .nav-badge {
   background: var(--danger);
   color: white;
@@ -357,7 +347,6 @@ header {
   display: none;
 }
 
-/* Overlay sombre */
 #sidebar-overlay {
   position: fixed;
   top: 0;
@@ -370,7 +359,6 @@ header {
   display: none;
 }
 
-/* Contenu & Animations */
 .content {
   flex: 1;
   padding: 30px;
@@ -408,7 +396,6 @@ header {
   }
 }
 
-/* Skeletons Loaders */
 .skeleton {
   background: linear-gradient(
     90deg,
@@ -439,7 +426,6 @@ header {
   margin-bottom: 15px;
 }
 
-/* Cartes */
 .card {
   background: var(--bg-card);
   padding: 24px;
@@ -478,7 +464,6 @@ header {
   gap: 24px;
 }
 
-/* Formulaires & Tableaux */
 .form-row {
   display: flex;
   gap: 15px;
@@ -548,7 +533,6 @@ header {
   color: white;
 }
 
-/* Stats & Graphiques */
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -612,12 +596,10 @@ header {
   padding-bottom: 20px;
 }
 .chart-card canvas {
-  max-height: 220px !important;
-  max-width: 220px !important;
-  margin: 10px auto !important;
+  width: 100% !important;
+  height: 100% !important;
 }
 
-/* Cartes Tonneaux/Fours */
 .barrels-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -736,7 +718,6 @@ header {
   color: #111;
 }
 
-/* Personnel, Commandes, Stock */
 .personnel-row {
   display: flex;
   justify-content: space-between;
@@ -832,7 +813,6 @@ header {
   border-color: var(--danger);
 }
 
-/* Stock */
 .stock-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -945,7 +925,6 @@ header {
   border-color: var(--border);
 }
 
-/* Salaires */
 .salary-row {
   display: flex;
   align-items: center;
@@ -990,7 +969,6 @@ header {
   color: #fff;
 }
 
-/* États vides */
 .empty-state {
   display: flex;
   flex-direction: column;
@@ -1010,7 +988,6 @@ header {
   color: var(--primary);
 }
 
-/* Modales */
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -1043,7 +1020,6 @@ header {
   font-size: 0.95em;
 }
 
-/* Toasts */
 #toast-container {
   position: fixed;
   top: 20px;
@@ -1094,7 +1070,6 @@ header {
   }
 }
 
-/* Prix Tableaux */
 .price-section {
   background: rgba(0, 0, 0, 0.2);
   border: 1px solid var(--border);
@@ -1122,7 +1097,6 @@ header {
   border-bottom: 1px dashed rgba(255, 255, 255, 0.05) !important;
 }
 
-/* Inputs Tonneau */
 .barrel-price-container {
   display: flex;
   align-items: center;
@@ -1159,9 +1133,76 @@ header {
   -moz-appearance: textfield;
 }
 
-/* =========================================
-   RESPONSIVE
-   ========================================= */
+/* KPI CARDS (DASHBOARD PATRON) */
+.kpi-grid {
+  display: grid !important;
+  grid-template-columns: repeat(4, 1fr) !important;
+  gap: 20px;
+  margin-bottom: 24px;
+  width: 100%;
+}
+.kpi-card {
+  background: var(--bg-card);
+  padding: 20px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s;
+}
+.kpi-card:hover {
+  transform: translateY(-3px);
+}
+.kpi-icon {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5em;
+  background: rgba(255, 255, 255, 0.05);
+  flex-shrink: 0;
+}
+.kpi-icon.text-success {
+  color: var(--success);
+  background: rgba(46, 125, 50, 0.15);
+}
+.kpi-icon.text-warning {
+  color: var(--warning);
+  background: rgba(230, 126, 34, 0.15);
+}
+.kpi-icon.text-primary {
+  color: var(--primary);
+  background: rgba(212, 175, 55, 0.15);
+}
+.kpi-icon.text-danger {
+  color: var(--danger);
+  background: rgba(198, 40, 40, 0.15);
+}
+.kpi-info {
+  display: flex;
+  flex-direction: column;
+}
+.kpi-info h4 {
+  font-size: 0.75em;
+  color: var(--text-muted);
+  margin-bottom: 5px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-family: "Inter", sans-serif;
+}
+.kpi-info p {
+  font-size: 1.6em;
+  font-family: "Cinzel";
+  font-weight: 700;
+  color: var(--text-main);
+  margin: 0;
+  line-height: 1.2;
+}
+
 @media (max-width: 1024px) {
   .grid-layout,
   .grid-layout-equal,
@@ -1170,6 +1211,9 @@ header {
   }
   .stats-grid {
     grid-template-columns: 1fr 1fr;
+  }
+  .kpi-grid {
+    grid-template-columns: 1fr 1fr !important;
   }
 }
 
@@ -1211,6 +1255,9 @@ header {
   }
   .stats-grid {
     grid-template-columns: 1fr;
+  }
+  .kpi-grid {
+    grid-template-columns: 1fr !important;
   }
   .card {
     padding: 15px;

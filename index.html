@@ -18,7 +18,6 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   </head>
   <body class="theme-autumn">
-    <!-- AUTH -->
     <div id="auth-screen" class="full-screen">
       <div class="auth-box">
         <div class="auth-logo"><i class="fa-solid fa-tree"></i></div>
@@ -71,7 +70,6 @@
       </div>
     </div>
 
-    <!-- PENDING -->
     <div id="pending-screen" class="full-screen" style="display: none">
       <div class="auth-box text-center">
         <i
@@ -91,7 +89,6 @@
       </div>
     </div>
 
-    <!-- APP -->
     <div id="app-screen" style="display: none">
       <header>
         <button class="burger-menu" onclick="toggleSidebar()">
@@ -188,7 +185,6 @@
 
         <main class="content">
           <div class="content-inner">
-            <!-- ONGLET COMMANDES -->
             <section id="tab-commandes" class="tab-content active">
               <h2 class="page-title">Bons de Commande</h2>
               <div class="grid-layout">
@@ -287,7 +283,6 @@
               </div>
             </section>
 
-            <!-- HISTORIQUE COMMANDES -->
             <section id="tab-historique-cdes" class="tab-content">
               <h2 class="page-title">Historique des Commandes</h2>
               <div class="card">
@@ -316,7 +311,6 @@
               </div>
             </section>
 
-            <!-- ONGLET STOCK -->
             <section id="tab-stock" class="tab-content">
               <h2 class="page-title">État du Stock</h2>
               <div
@@ -472,7 +466,6 @@
               </div>
             </section>
 
-            <!-- ONGLET SAISIE -->
             <section id="tab-saisie" class="tab-content">
               <h2 class="page-title">Enregistrer une opération</h2>
               <div class="grid-layout-equal">
@@ -557,7 +550,6 @@
                         />
                       </div>
                     </div>
-                    <!-- INDICATEUR DE MARGE -->
                     <div
                       id="margin-indicator"
                       style="
@@ -571,7 +563,6 @@
                         transition: 0.3s;
                       "
                     ></div>
-
                     <button type="submit" class="btn-primary">
                       <i class="fa-solid fa-plus"></i> Enregistrer
                     </button>
@@ -687,7 +678,6 @@
               </div>
             </section>
 
-            <!-- TONNEAUX -->
             <section id="tab-location" class="tab-content">
               <h2 class="page-title">Location de Tonneaux</h2>
               <p
@@ -706,7 +696,6 @@
               </div>
             </section>
 
-            <!-- FOURS -->
             <section id="tab-four" class="tab-content">
               <div
                 style="
@@ -740,7 +729,6 @@
               </div>
             </section>
 
-            <!-- HISTORIQUE EMP -->
             <section id="tab-historique" class="tab-content">
               <h2 class="page-title">Mon Historique</h2>
               <div class="card">
@@ -769,7 +757,6 @@
               </div>
             </section>
 
-            <!-- GESTION PATRON (DASHBOARD NEXT-GEN) -->
             <section id="tab-gestion" class="tab-content">
               <div
                 style="
@@ -803,7 +790,6 @@
                 </div>
               </div>
 
-              <!-- NOUVEAUX KPI CARDS -->
               <div class="kpi-grid">
                 <div class="kpi-card">
                   <div class="kpi-icon text-success">
@@ -843,7 +829,6 @@
                 </div>
               </div>
 
-              <!-- GRAPHIQUE DE TENDANCE -->
               <div class="card" style="height: 350px; margin-bottom: 24px">
                 <h3>
                   <i class="fa-solid fa-arrow-trend-up"></i> Tendance (Ventes vs
@@ -854,7 +839,6 @@
                 </div>
               </div>
 
-              <!-- ANCIENS GRAPHIQUES CAMEMBERT -->
               <div class="charts-grid">
                 <div
                   class="card chart-card"
@@ -876,7 +860,6 @@
                 </div>
               </div>
 
-              <!-- TABLEAUX & PERSONNEL -->
               <div class="grid-layout">
                 <div class="col-left">
                   <div class="card">
@@ -1016,7 +999,6 @@
               </div>
             </section>
 
-            <!-- LOGS -->
             <section id="tab-logs" class="tab-content">
               <h2 class="page-title">Journal d'Audit</h2>
               <div class="card">
@@ -1046,7 +1028,6 @@
       </div>
     </div>
 
-    <!-- MODALES & TOASTS -->
     <div id="custom-popup" class="modal-overlay">
       <div class="modal-box">
         <h3 id="popup-title">Info</h3>
@@ -1105,11 +1086,9 @@
       </div>
     </div>
 
-    <!-- MODALE NOUVEAU CLIENT FOUR (MISE A JOUR PRESTATION VS HEBDO) -->
     <div id="create-furnace-modal" class="modal-overlay">
       <div class="modal-box">
         <h3>Nouveau Client (Four)</h3>
-
         <div class="input-group" style="margin-bottom: 15px">
           <label style="text-align: center">Nom du client</label>
           <input
@@ -1119,7 +1098,6 @@
             style="text-align: center; font-size: 1.1em; padding: 15px"
           />
         </div>
-
         <div class="input-group" style="margin-bottom: 15px">
           <label style="text-align: center">Type de location</label>
           <select
@@ -1130,7 +1108,6 @@
             <option value="usage">À la prestation (À la demande)</option>
           </select>
         </div>
-
         <div class="input-group" style="margin-bottom: 20px">
           <label style="text-align: center">Prix (S)</label>
           <input
@@ -1141,7 +1118,6 @@
             style="text-align: center; font-size: 1.1em; padding: 15px"
           />
         </div>
-
         <div style="display: flex; gap: 10px">
           <button
             class="btn-secondary"
