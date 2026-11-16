@@ -592,11 +592,11 @@
                         <tr>
                           <td>Pauvre charbon</td>
                           <td class="text-success">0.7 $/u</td>
-                          <td class="text-success">0.6 $/u</td>
+                          <td class="text-success">0.7 $/u</td>
                         </tr>
                         <tr>
                           <td>Charbon</td>
-                          <td class="text-success">1.3 $/u</td>
+                          <td class="text-success">1.2 $/u</td>
                           <td class="text-success">1.2 $/u</td>
                         </tr>
                         <tr>
@@ -618,7 +618,7 @@
                         color: var(--success);
                       "
                     >
-                      <i class="fa-solid fa-tree"></i> Vente du Bois : 0.2 $/u
+                      <i class="fa-solid fa-tree"></i> Vente du Bois : 0.4 $/u
                     </div>
                   </div>
                   <div class="price-section mt-15">
@@ -641,13 +641,13 @@
                         <tr>
                           <td>Pauvre</td>
                           <td class="text-warning">0.3 $/u</td>
-                          <td class="text-warning">0.4 $/u</td>
+                          <td class="text-warning">0.5 $/u</td>
                           <td class="text-warning">0.5 $/u</td>
                         </tr>
                         <tr>
                           <td>Charbon</td>
                           <td class="text-warning">0.8 $/u</td>
-                          <td class="text-warning">0.9 $/u</td>
+                          <td class="text-warning">1.0 $/u</td>
                           <td class="text-warning">1.0 $/u</td>
                         </tr>
                         <tr>
@@ -671,7 +671,7 @@
                         color: var(--warning);
                       "
                     >
-                      <i class="fa-solid fa-tree"></i> Rachat du Bois : 0.15 $/u
+                      <i class="fa-solid fa-tree"></i> Rachat du Bois : 0.20 $/u
                     </div>
                   </div>
                 </div>
@@ -764,29 +764,58 @@
                   justify-content: space-between;
                   align-items: center;
                   margin-bottom: 20px;
+                  flex-wrap: wrap;
+                  gap: 10px;
                 "
               >
                 <h2 class="page-title" style="margin-bottom: 0; border: none">
                   Tableau de Bord
                 </h2>
-                <div class="input-group" style="width: 220px; margin-bottom: 0">
-                  <select
-                    id="period-selector"
-                    onchange="changePeriod(this.value)"
-                    style="
-                      background: rgba(0, 0, 0, 0.2);
-                      border: 1px solid var(--primary);
-                      font-weight: bold;
-                      color: var(--primary);
-                      padding-left: 15px;
-                      font-family: &quot;Cinzel&quot;;
-                    "
+                <div style="display: flex; gap: 10px; flex-wrap: wrap">
+                  <!-- Sélecteur pour les tableaux et graphiques -->
+                  <div
+                    class="input-group"
+                    style="width: 180px; margin-bottom: 0"
                   >
-                    <option value="all">Depuis toujours</option>
-                    <option value="today">Aujourd'hui</option>
-                    <option value="week">7 derniers jours</option>
-                    <option value="month">Ce mois-ci</option>
-                  </select>
+                    <select
+                      id="period-selector"
+                      onchange="changePeriod(this.value)"
+                      style="
+                        background: rgba(0, 0, 0, 0.2);
+                        border: 1px solid var(--primary);
+                        font-weight: bold;
+                        color: var(--primary);
+                        padding-left: 15px;
+                        font-family: &quot;Cinzel&quot;;
+                      "
+                    >
+                      <option value="all">Depuis toujours</option>
+                      <option value="today">Aujourd'hui</option>
+                      <option value="week">7 derniers jours</option>
+                      <option value="month">Ce mois-ci</option>
+                    </select>
+                  </div>
+                  <!-- Nouveau sélecteur POUR LES CARTES KPI -->
+                  <div
+                    class="input-group"
+                    style="width: 180px; margin-bottom: 0"
+                  >
+                    <select
+                      id="kpi-period-selector"
+                      onchange="changeKpiPeriod(this.value)"
+                      style="
+                        background: rgba(0, 0, 0, 0.2);
+                        border: 1px solid var(--success);
+                        font-weight: bold;
+                        color: var(--success);
+                        padding-left: 15px;
+                        font-family: &quot;Cinzel&quot;;
+                      "
+                    >
+                      <option value="week">CA/Bénéf : 7 Jours</option>
+                      <option value="month">CA/Bénéf : Ce Mois</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
@@ -796,7 +825,7 @@
                     <i class="fa-solid fa-sack-dollar"></i>
                   </div>
                   <div class="kpi-info">
-                    <h4>CA (Ce Mois)</h4>
+                    <h4 id="kpi-ca-label">CA (7 Jours)</h4>
                     <p id="kpi-ca">0 S</p>
                   </div>
                 </div>
@@ -805,7 +834,7 @@
                     <i class="fa-solid fa-chart-line"></i>
                   </div>
                   <div class="kpi-info">
-                    <h4>Bénéfice (Ce Mois)</h4>
+                    <h4 id="kpi-profit-label">Bénéfice (7 Jours)</h4>
                     <p id="kpi-profit">0 S</p>
                   </div>
                 </div>
@@ -842,18 +871,42 @@
               <div class="charts-grid">
                 <div
                   class="card chart-card"
-                  style="height: 300px; min-height: auto"
+                  style="height: 350px; min-height: auto"
                 >
                   <h3>Répartition des Achats</h3>
+                  <p
+                    id="total-achats-display"
+                    style="
+                      font-size: 1.8em;
+                      font-family: &quot;Cinzel&quot;;
+                      font-weight: 700;
+                      color: var(--danger);
+                      margin-bottom: 10px;
+                    "
+                  >
+                    0 S
+                  </p>
                   <div style="position: relative; height: 200px; width: 100%">
                     <canvas id="chart-achats"></canvas>
                   </div>
                 </div>
                 <div
                   class="card chart-card"
-                  style="height: 300px; min-height: auto"
+                  style="height: 350px; min-height: auto"
                 >
                   <h3>Répartition des Ventes</h3>
+                  <p
+                    id="total-ventes-display"
+                    style="
+                      font-size: 1.8em;
+                      font-family: &quot;Cinzel&quot;;
+                      font-weight: 700;
+                      color: var(--success);
+                      margin-bottom: 10px;
+                    "
+                  >
+                    0 S
+                  </p>
                   <div style="position: relative; height: 200px; width: 100%">
                     <canvas id="chart-ventes"></canvas>
                   </div>

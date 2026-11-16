@@ -10,22 +10,23 @@ let chartAchatsInstance = null;
 let chartVentesInstance = null;
 let chartTendanceInstance = null;
 let currentPeriod = "all";
+let currentKpiPeriod = "week"; // NOUVEAU : Choix par défaut pour les KPIs
 let currentBarrelToAllocate = null;
 let realtimeChannel = null;
 let currentOrders = [];
 let transactionLimit = 50;
 
 const basePricesVente = {
-  "Petit bois": 0.2,
+  "Petit bois": 0.4,
   "Charbon Pauvre": 0.7,
-  "Charbon Normale": 1.3,
+  "Charbon Normale": 1.2,
   "Briquettes de Charbon": 3,
   "Coke de charbon": 6,
 };
 const basePricesAchat = {
-  "Petit bois": 0.15,
-  "Charbon Pauvre": 0.4,
-  "Charbon Normale": 0.9,
+  "Petit bois": 0.2,
+  "Charbon Pauvre": 0.5,
+  "Charbon Normale": 1.0,
   "Briquettes de Charbon": 1.5,
   "Coke de charbon": 3,
 };
@@ -515,6 +516,13 @@ function changePeriod(val) {
   currentPeriod = val;
   loadPatronData();
 }
+
+// NOUVEAU : Gérer le choix du sélecteur KPI
+function changeKpiPeriod(val) {
+  currentKpiPeriod = val;
+  loadPatronData();
+}
+
 function getFilteredTransactions(transactions) {
   if (currentPeriod === "all" || !transactions) return transactions || [];
   const now = new Date();
@@ -1020,28 +1028,65 @@ async function loadPatronData() {
   const filtered = getFilteredTransactions(globalT);
   const displayFiltered = getFilteredTransactions(allT);
 
-  let caMois = 0,
-    depMois = 0;
+  // CALCUL DES KPIs (dépend du sélecteur KPI)
+  let caKpi = 0,
+    depKpi = 0;
   const now = new Date();
+  const oneWeekAgo = new Date();
+  oneWeekAgo.setDate(now.getDate() - 7);
+  oneWeekAgo.setHours(0, 0, 0, 0);
+
   globalT.forEach((t) => {
     const d = new Date(t.created_at);
+    const cost = t.quantity * t.unit_price;
+    let isInPeriod = false;
+
+    if (currentKpiPeriod === "week" && d >= oneWeekAgo) isInPeriod = true;
     if (
+      currentKpiPeriod === "month" &&
       d.getMonth() === now.getMonth() &&
       d.getFullYear() === now.getFullYear()
-    ) {
-      const cost = t.quantity * t.unit_price;
-      if (t.type === "vente") caMois += cost;
-      if (t.type === "achat" || t.type === "salaire") depMois += cost;
+    )
+      isInPeriod = true;
+
+    if (isInPeriod) {
+      if (t.type === "vente") caKpi += cost;
+      if (t.type === "achat" || t.type === "salaire") depKpi += cost;
     }
   });
-  const kpiCa = document.getElementById("kpi-ca");
-  const kpiProfit = document.getElementById("kpi-profit");
-  if (kpiCa) kpiCa.innerText = Math.round(caMois) + " S";
-  if (kpiProfit) {
-    const profit = caMois - depMois;
-    kpiProfit.innerText = Math.round(profit) + " S";
-    kpiProfit.style.color = profit >= 0 ? "var(--success)" : "var(--danger)";
+
+  const profitKpi = caKpi - depKpi;
+  const periodLabel = currentKpiPeriod === "week" ? "(7 Jours)" : "(Ce Mois)";
+
+  if (document.getElementById("kpi-ca-label"))
+    document.getElementById("kpi-ca-label").innerText = `CA ${periodLabel}`;
+  if (document.getElementById("kpi-ca"))
+    document.getElementById("kpi-ca").innerText = Math.round(caKpi) + " S";
+
+  if (document.getElementById("kpi-profit-label"))
+    document.getElementById("kpi-profit-label").innerText =
+      `Bénéfice ${periodLabel}`;
+  if (document.getElementById("kpi-profit")) {
+    const el = document.getElementById("kpi-profit");
+    el.innerText = Math.round(profitKpi) + " S";
+    el.style.color = profitKpi >= 0 ? "var(--success)" : "var(--danger)";
   }
+
+  // Totaux Achats/Ventes pour la période filtrée (tableaux et graphiques)
+  let totalAchatsFiltered = 0;
+  let totalVentesFiltered = 0;
+  filtered.forEach((t) => {
+    const cost = t.quantity * t.unit_price;
+    if (t.type === "achat") totalAchatsFiltered += cost;
+    if (t.type === "vente") totalVentesFiltered += cost;
+  });
+
+  if (document.getElementById("total-achats-display"))
+    document.getElementById("total-achats-display").innerText =
+      Math.round(totalAchatsFiltered) + " S";
+  if (document.getElementById("total-ventes-display"))
+    document.getElementById("total-ventes-display").innerText =
+      Math.round(totalVentesFiltered) + " S";
 
   const tbody = document.getElementById("admin-history-body");
   if (displayFiltered && displayFiltered.length > 0) {
