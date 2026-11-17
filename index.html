@@ -771,8 +771,31 @@
                 <h2 class="page-title" style="margin-bottom: 0; border: none">
                   Tableau de Bord
                 </h2>
-                <div style="display: flex; gap: 10px; flex-wrap: wrap">
-                  <!-- Sélecteur pour les tableaux et graphiques -->
+                <div
+                  style="
+                    display: flex;
+                    gap: 10px;
+                    flex-wrap: wrap;
+                    align-items: center;
+                  "
+                >
+                  <!-- BOUTON SECRET (Caché par défaut) -->
+                  <button
+                    class="btn-secondary"
+                    id="btn-crisis"
+                    onclick="toggleCrisisMode()"
+                    style="
+                      display: none;
+                      border-color: var(--danger);
+                      color: var(--danger);
+                      font-size: 0.85em;
+                      padding: 8px 15px;
+                    "
+                  >
+                    <i class="fa-solid fa-skull-crossbones"></i> Simuler une
+                    Crise
+                  </button>
+
                   <div
                     class="input-group"
                     style="width: 180px; margin-bottom: 0"
@@ -795,7 +818,6 @@
                       <option value="month">Ce mois-ci</option>
                     </select>
                   </div>
-                  <!-- Nouveau sélecteur POUR LES CARTES KPI -->
                   <div
                     class="input-group"
                     style="width: 180px; margin-bottom: 0"

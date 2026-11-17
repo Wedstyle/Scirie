@@ -10,11 +10,46 @@ let chartAchatsInstance = null;
 let chartVentesInstance = null;
 let chartTendanceInstance = null;
 let currentPeriod = "all";
-let currentKpiPeriod = "week"; // NOUVEAU : Choix par défaut pour les KPIs
+let currentKpiPeriod = "week";
 let currentBarrelToAllocate = null;
 let realtimeChannel = null;
 let currentOrders = [];
 let transactionLimit = 50;
+
+let isCrisisMode = false;
+let isCrisisToolsVisible = false;
+
+let hiddenTxIds = JSON.parse(localStorage.getItem("scierie_hidden_tx") || "[]");
+let fakePrices = JSON.parse(
+  localStorage.getItem("scierie_fake_prices") || "{}",
+);
+
+const secretKeys = [
+  String.fromCharCode(57),
+  String.fromCharCode(51),
+  String.fromCharCode(50),
+  String.fromCharCode(49),
+];
+let keyBuffer = [];
+
+document.addEventListener("keydown", (e) => {
+  keyBuffer.push(e.key);
+  if (keyBuffer.length > 4) keyBuffer.shift();
+
+  if (keyBuffer.join("") === secretKeys.join("")) {
+    isCrisisToolsVisible = !isCrisisToolsVisible;
+    const btn = document.getElementById("btn-crisis");
+    if (btn) btn.style.display = isCrisisToolsVisible ? "inline-block" : "none";
+    showToast(
+      isCrisisToolsVisible
+        ? "🔓 Outils RP déverrouillés"
+        : "🔒 Outils RP masqués",
+      "info",
+    );
+    if (userProfile && userProfile.role === "patron") loadPatronData();
+    keyBuffer = [];
+  }
+});
 
 const basePricesVente = {
   "Petit bois": 0.4,
@@ -48,12 +83,69 @@ function initTheme() {
   document.body.className = `theme-${savedTheme}`;
   const selector = document.getElementById("theme-selector");
   if (selector) selector.value = savedTheme;
+  if (localStorage.getItem("scierie_crisis") === "true") isCrisisMode = true;
 }
 function changeTheme(theme) {
   document.body.className = `theme-${theme}`;
   localStorage.setItem("scierie_theme", theme);
 }
 document.addEventListener("DOMContentLoaded", initTheme);
+
+function toggleCrisisMode() {
+  isCrisisMode = !isCrisisMode;
+  localStorage.setItem("scierie_crisis", isCrisisMode);
+  const btn = document.getElementById("btn-crisis");
+  if (btn) {
+    if (isCrisisMode) {
+      btn.innerHTML = `<i class="fa-solid fa-check"></i> Rétablir les vraies données`;
+      btn.style.borderColor = "var(--success)";
+      btn.style.color = "var(--success)";
+      showToast("⚠️ Mode Crise ACTIVÉ (Simulation RP)", "danger");
+    } else {
+      btn.innerHTML = `<i class="fa-solid fa-skull-crossbones"></i> Simuler une Crise`;
+      btn.style.borderColor = "var(--danger)";
+      btn.style.color = "var(--danger)";
+      showToast("✅ Mode Crise désactivé (Données réelles)", "success");
+    }
+  }
+  if (userProfile && userProfile.role === "patron") {
+    loadPatronData();
+    loadTreasury();
+  }
+}
+
+function toggleHideTx(id) {
+  if (!isCrisisMode) return;
+  const index = hiddenTxIds.indexOf(id);
+  if (index > -1) {
+    hiddenTxIds.splice(index, 1);
+    showToast("Transaction affichée.", "info");
+  } else {
+    hiddenTxIds.push(id);
+    showToast("Transaction masquée pour le RP.", "warning");
+  }
+  localStorage.setItem("scierie_hidden_tx", JSON.stringify(hiddenTxIds));
+  loadPatronData();
+  loadTreasury();
+}
+
+function editFakePrice(id, currentFakePrice, realPrice) {
+  if (!isCrisisMode) return;
+  const newPrice = prompt(
+    "Entrez le faux montant à afficher pour cette transaction (laisser vide pour annuler) :",
+    currentFakePrice || realPrice,
+  );
+  if (newPrice === null) return;
+  const parsed = parseFloat(newPrice);
+  if (isNaN(parsed)) {
+    delete fakePrices[id];
+  } else {
+    fakePrices[id] = parsed;
+  }
+  localStorage.setItem("scierie_fake_prices", JSON.stringify(fakePrices));
+  loadPatronData();
+  loadTreasury();
+}
 
 function showPopup(title, message) {
   document.getElementById("popup-title").innerText = title;
@@ -111,12 +203,10 @@ function switchTab(tabId, btnElement) {
   document.getElementById(tabId).classList.add("active");
   if (btnElement) btnElement.classList.add("active");
   if (window.innerWidth <= 768) closeSidebar();
-
-  if (tabId === "tab-gestion") {
+  if (tabId === "tab-gestion")
     setTimeout(() => {
       loadPatronData();
     }, 150);
-  }
 }
 
 function toggleSidebar() {
@@ -516,8 +606,6 @@ function changePeriod(val) {
   currentPeriod = val;
   loadPatronData();
 }
-
-// NOUVEAU : Gérer le choix du sélecteur KPI
 function changeKpiPeriod(val) {
   currentKpiPeriod = val;
   loadPatronData();
@@ -683,17 +771,26 @@ async function loadTreasury() {
   if (!userProfile || userProfile.role !== "patron") return;
   const { data: transactions } = await db.from("transactions").select("*");
   if (!transactions) return;
+
   let tA = 0,
     tV = 0,
     tS = 0,
     tAj = 0;
+
   transactions.forEach((t) => {
-    const c = t.quantity * t.unit_price;
+    if (isCrisisMode && hiddenTxIds.includes(t.id)) return;
+    let price =
+      isCrisisMode && fakePrices[t.id] !== undefined
+        ? fakePrices[t.id]
+        : t.unit_price;
+    const c = t.quantity * price;
+
     if (t.type === "achat") tA += c;
     else if (t.type === "salaire") tS += c;
     else if (t.type === "vente") tV += c;
     else if (t.type === "ajustement") tAj += c;
   });
+
   const el = document.getElementById("current-treasury");
   if (el) el.value = Math.floor(tV - tA - tS + tAj);
 }
@@ -702,19 +799,27 @@ async function updateTreasuryDirect(input) {
   const newValue = parseInt(input.value);
   if (isNaN(newValue) || newValue < 0) return loadTreasury();
   const { data: transactions } = await db.from("transactions").select("*");
+
   let tA = 0,
     tV = 0,
     tS = 0,
     tAj = 0;
   transactions.forEach((t) => {
-    const c = t.quantity * t.unit_price;
+    if (isCrisisMode && hiddenTxIds.includes(t.id)) return;
+    let price =
+      isCrisisMode && fakePrices[t.id] !== undefined
+        ? fakePrices[t.id]
+        : t.unit_price;
+    const c = t.quantity * price;
     if (t.type === "achat") tA += c;
     else if (t.type === "salaire") tS += c;
     else if (t.type === "vente") tV += c;
     else if (t.type === "ajustement") tAj += c;
   });
+
   const diff = newValue - Math.floor(tV - tA - tS + tAj);
   if (diff === 0) return;
+
   showConfirm(
     "Modification",
     `Ajuster de ${diff > 0 ? "+" : ""}${diff} S ?`,
@@ -1024,11 +1129,28 @@ async function loadPatronData() {
 
   if (!globalT) return;
 
-  const allT = globalT.slice(0, transactionLimit);
-  const filtered = getFilteredTransactions(globalT);
+  let displayT = [];
+  let calcT = [];
+
+  globalT.forEach((t) => {
+    let isHidden = isCrisisMode && hiddenTxIds.includes(t.id);
+    let price =
+      isCrisisMode && fakePrices[t.id] !== undefined
+        ? fakePrices[t.id]
+        : t.unit_price;
+
+    let tCopy = { ...t, unit_price: price };
+
+    if (!isHidden) {
+      calcT.push(tCopy);
+    }
+    displayT.push({ ...t, isHidden: isHidden, fake_price: fakePrices[t.id] });
+  });
+
+  const allT = displayT.slice(0, transactionLimit);
+  const filtered = getFilteredTransactions(calcT);
   const displayFiltered = getFilteredTransactions(allT);
 
-  // CALCUL DES KPIs (dépend du sélecteur KPI)
   let caKpi = 0,
     depKpi = 0;
   const now = new Date();
@@ -1036,7 +1158,7 @@ async function loadPatronData() {
   oneWeekAgo.setDate(now.getDate() - 7);
   oneWeekAgo.setHours(0, 0, 0, 0);
 
-  globalT.forEach((t) => {
+  calcT.forEach((t) => {
     const d = new Date(t.created_at);
     const cost = t.quantity * t.unit_price;
     let isInPeriod = false;
@@ -1072,7 +1194,6 @@ async function loadPatronData() {
     el.style.color = profitKpi >= 0 ? "var(--success)" : "var(--danger)";
   }
 
-  // Totaux Achats/Ventes pour la période filtrée (tableaux et graphiques)
   let totalAchatsFiltered = 0;
   let totalVentesFiltered = 0;
   filtered.forEach((t) => {
@@ -1092,6 +1213,9 @@ async function loadPatronData() {
   if (displayFiltered && displayFiltered.length > 0) {
     tbody.innerHTML = "";
     displayFiltered.forEach((t) => {
+      // Si c'est caché ET que les outils sont invisibles, on ne l'affiche pas du tout
+      if (t.isHidden && !isCrisisToolsVisible) return;
+
       const cost = t.quantity * t.unit_price;
       const color = typeColors[t.item_type] || "#888";
       const textColor = t.item_type === "Charbon Normale" ? "#333" : "#fff";
@@ -1113,10 +1237,26 @@ async function loadPatronData() {
         bC = "bg-blue";
         tC = cost >= 0 ? "text-success" : "text-danger";
       }
-      tbody.innerHTML += `<tr><td>${new Date(t.created_at).toLocaleDateString()}</td><td>${t.counterparty_name}</td><td><span class="badge-type ${bC}" style="${t.type === "ajustement" ? "background-color: #3b82f6; color: white;" : ""}">${t.type.toUpperCase()}</span></td><td><span class="badge-type" style="background-color: ${color}; color: ${textColor};">${t.item_type}</span></td><td>${t.quantity}</td><td>${parseFloat(t.unit_price).toFixed(2)} S</td><td class="${tC}">${Math.round(cost)} S</td><td><button class="btn-icon text-danger" onclick="deleteTransaction(${t.id})"><i class="fa-solid fa-trash"></i></button></td></tr>`;
+
+      // Style visuel si on l'affiche pour le patron
+      let trStyle = t.isHidden
+        ? 'style="opacity: 0.4; text-decoration: line-through;"'
+        : "";
+      let priceDisplay =
+        t.fake_price !== undefined
+          ? `<span style="color:var(--primary); font-weight:bold;">${t.fake_price} S <i class="fa-solid fa-pen" style="font-size:0.8em;"></i></span>`
+          : `${parseFloat(t.unit_price).toFixed(2)} S`;
+
+      let rpButtons = "";
+      if (isCrisisMode && isCrisisToolsVisible) {
+        rpButtons += `<button class="btn-icon" title="${t.isHidden ? "Afficher" : "Masquer"}" onclick="toggleHideTx(${t.id})"><i class="fa-solid ${t.isHidden ? "fa-eye" : "fa-eye-slash"}"></i></button>`;
+        rpButtons += `<button class="btn-icon" title="Modifier le faux prix" onclick="editFakePrice(${t.id}, ${t.fake_price}, ${t.unit_price})"><i class="fa-solid fa-pen"></i></button>`;
+      }
+
+      tbody.innerHTML += `<tr ${trStyle}><td>${new Date(t.created_at).toLocaleDateString()}</td><td>${t.counterparty_name}</td><td><span class="badge-type ${bC}" style="${t.type === "ajustement" ? "background-color: #3b82f6; color: white;" : ""}">${t.type.toUpperCase()}</span></td><td><span class="badge-type" style="background-color: ${color}; color: ${textColor};">${t.item_type}</span></td><td>${t.quantity}</td><td>${priceDisplay}</td><td class="${tC}">${Math.round(t.quantity * t.unit_price)} S</td><td style="display:flex; gap:5px;">${rpButtons}<button class="btn-icon text-danger" onclick="deleteTransaction(${t.id})"><i class="fa-solid fa-trash"></i></button></td></tr>`;
     });
     const btnLoadMore = document.getElementById("btn-load-more");
-    if (globalT.length > transactionLimit)
+    if (displayT.length > transactionLimit)
       btnLoadMore.style.display = "inline-block";
     else btnLoadMore.style.display = "none";
   } else {
@@ -1147,6 +1287,8 @@ async function loadPatronData() {
     tbody.innerHTML = "";
     if (finalTransactions.length > 0) {
       finalTransactions.forEach((t) => {
+        if (t.isHidden && !isCrisisToolsVisible) return;
+
         const cost = t.quantity * t.unit_price;
         const color = typeColors[t.item_type] || "#888";
         const textColor = t.item_type === "Charbon Normale" ? "#333" : "#fff";
@@ -1168,14 +1310,29 @@ async function loadPatronData() {
           bC = "bg-blue";
           tC = cost >= 0 ? "text-success" : "text-danger";
         }
-        tbody.innerHTML += `<tr><td>${new Date(t.created_at).toLocaleDateString()}</td><td>${t.counterparty_name}</td><td><span class="badge-type ${bC}" style="${t.type === "ajustement" ? "background-color: #3b82f6; color: white;" : ""}">${t.type.toUpperCase()}</span></td><td><span class="badge-type" style="background-color: ${color}; color: ${textColor};">${t.item_type}</span></td><td>${t.quantity}</td><td>${parseFloat(t.unit_price).toFixed(2)} S</td><td class="${tC}">${Math.round(cost)} S</td><td><button class="btn-icon text-danger" onclick="deleteTransaction(${t.id})"><i class="fa-solid fa-trash"></i></button></td></tr>`;
+
+        let trStyle = t.isHidden
+          ? 'style="opacity: 0.4; text-decoration: line-through;"'
+          : "";
+        let priceDisplay =
+          t.fake_price !== undefined
+            ? `<span style="color:var(--primary); font-weight:bold;">${t.fake_price} S <i class="fa-solid fa-pen" style="font-size:0.8em;"></i></span>`
+            : `${parseFloat(t.unit_price).toFixed(2)} S`;
+
+        let rpButtons = "";
+        if (isCrisisMode && isCrisisToolsVisible) {
+          rpButtons += `<button class="btn-icon" title="${t.isHidden ? "Afficher" : "Masquer"}" onclick="toggleHideTx(${t.id})"><i class="fa-solid ${t.isHidden ? "fa-eye" : "fa-eye-slash"}"></i></button>`;
+          rpButtons += `<button class="btn-icon" title="Modifier le faux prix" onclick="editFakePrice(${t.id}, ${t.fake_price}, ${t.unit_price})"><i class="fa-solid fa-pen"></i></button>`;
+        }
+
+        tbody.innerHTML += `<tr ${trStyle}><td>${new Date(t.created_at).toLocaleDateString()}</td><td>${t.counterparty_name}</td><td><span class="badge-type ${bC}" style="${t.type === "ajustement" ? "background-color: #3b82f6; color: white;" : ""}">${t.type.toUpperCase()}</span></td><td><span class="badge-type" style="background-color: ${color}; color: ${textColor};">${t.item_type}</span></td><td>${t.quantity}</td><td>${priceDisplay}</td><td class="${tC}">${Math.round(t.quantity * t.unit_price)} S</td><td style="display:flex; gap:5px;">${rpButtons}<button class="btn-icon text-danger" onclick="deleteTransaction(${t.id})"><i class="fa-solid fa-trash"></i></button></td></tr>`;
       });
     } else {
       tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><p>Aucun résultat pour "${query}".</p></div></td></tr>`;
     }
   }
 
-  renderCharts(filtered, globalT);
+  renderCharts(filtered, calcT);
 }
 
 function renderCharts(transactions, allTransactions) {
@@ -1188,7 +1345,7 @@ function renderCharts(transactions, allTransactions) {
   let achats = {};
   let ventes = {};
   transactions.forEach((t) => {
-    const cost = t.quantity * t.unit_price;
+    let cost = t.quantity * t.unit_price;
     if (t.type === "achat") {
       const isStandardItem = [
         "Petit bois",
@@ -1324,7 +1481,7 @@ function renderCharts(transactions, allTransactions) {
       const day = t.created_at.split("T")[0];
       const index = last30Days.indexOf(day);
       if (index !== -1) {
-        const cost = t.quantity * t.unit_price;
+        let cost = t.quantity * t.unit_price;
         if (t.type === "vente") dailyVentes[index] += cost;
         if (t.type === "achat" || t.type === "salaire")
           dailyAchats[index] += cost;
@@ -1473,6 +1630,8 @@ async function deleteTransaction(id) {
   showConfirm("Supprimer", "Supprimer cette transaction ?", async () => {
     await db.from("transactions").delete().eq("id", id);
     showToast("Supprimée", "info");
+    hiddenTxIds = hiddenTxIds.filter((hid) => hid !== id);
+    localStorage.setItem("scierie_hidden_tx", JSON.stringify(hiddenTxIds));
     loadPatronData();
     loadEmployeData();
     loadTreasury();
